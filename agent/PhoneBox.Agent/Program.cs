@@ -104,6 +104,7 @@ AddMonitor<SteamMonitor>(builder.Services);
 AddMonitor<BatteryMonitor>(builder.Services);
 AddMonitor<RuleEngine>(builder.Services);
 AddMonitor<ChargeGuard>(builder.Services);
+AddMonitor<WindowsNotificationMonitor>(builder.Services);
 if (lanCert is not null)
     builder.Services.AddHostedService(sp => new LanDiscovery(configStore, Lan.Fingerprint(lanCert), lanCfg.Port, sp.GetRequiredService<ILogger<LanDiscovery>>()));
 builder.Services.AddHostedService<Tray>();
@@ -505,6 +506,7 @@ app.MapGet("/api/catalog", () => Results.Text($"{{\"cols\":{Catalog.Cols},\"rows
 // POST /api/goto/{page}      switches the phone to a page (id, or 1-based number)
 // POST /api/refresh          refreshes quotas/GitHub now and makes the phone reload its settings and data; ?reload=1 reloads the whole panel
 app.MapGet("/api/push", (PushStore push) => Results.Json(new { version = push.Version, items = push.Snapshot() }));
+app.MapGet("/api/notifications", (WindowsNotificationMonitor winNotifs) => Results.Json(new { items = winNotifs.Recent() }));
 app.MapGet("/api/push/{key}", (string key, PushStore push) => push.Get(key) is { } item ? Results.Json(item) : Results.NotFound());
 app.MapMethods("/api/push/{key}", ["POST", "PUT"], async (string key, int? ttl, HttpRequest req, PushStore push) =>
 {

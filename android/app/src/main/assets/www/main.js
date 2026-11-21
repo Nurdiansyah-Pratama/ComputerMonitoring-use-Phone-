@@ -455,6 +455,7 @@ export const color = (c) => (c && c.startsWith('--') ? cssVar(c) : c);
 
 export let toastTimer = 0;
 let wxNotifSeq = 0;
+const dismissedNotifKeys = new Set();
 
 function hasVisibleWeatherNotifSlot() {
   const cur = pages[curPage];
@@ -464,10 +465,11 @@ function hasVisibleWeatherNotifSlot() {
 
 export function pushWeatherNotif({ key, source = 'pc', app = '', title = '', text = '', level = 'info', at = Date.now(), ttlMs = 0 }) {
   const k = key || `pb:${++wxNotifSeq}`;
+  if (dismissedNotifKeys.has(k)) return;
   const item = {
     key: k,
     source,
-    app: app || (source === 'pc' ? 'PhoneBox' : ''),
+    app: app || (source === 'pc' ? 'PC' : ''),
     title: title || '',
     text: text || '',
     level: level || 'info',
@@ -487,12 +489,38 @@ export function pushWeatherNotif({ key, source = 'pc', app = '', title = '', tex
 }
 
 export function dismissWeatherNotif(key) {
+  dismissedNotifKeys.add(key);
+  if (dismissedNotifKeys.size > 200) dismissedNotifKeys.delete(dismissedNotifKeys.values().next().value);
   const found = D.weatherNotifs.find((x) => x.key === key);
   D.weatherNotifs = D.weatherNotifs.filter((x) => x.key !== key);
   if (found && found.source === 'android') {
     try { bridge && bridge.dismissNotif && bridge.dismissNotif(key); } catch (_) {}
   }
   emit('weatherNotif');
+}
+
+export async function loadPcNotifications() {
+  if (PREVIEW) return;
+  try {
+    const r = await api('/notifications', 'GET', 4000);
+    const items = Array.isArray(r?.items) ? r.items : [];
+    const cutoff = Date.now() - 15 * 60_000;
+    let changed = false;
+    for (const p of items.slice().reverse()) {
+      if (!p || !p.key || dismissedNotifKeys.has(p.key)) continue;
+      if (p.at && p.at < cutoff) continue;
+      if (D.weatherNotifs.some((x) => x.key === p.key)) continue;
+      D.weatherNotifs.unshift({
+        key: p.key, source: 'pc', app: p.app || 'PC', title: p.title || '', text: p.text || '',
+        level: p.level || 'info', at: p.at || Date.now(), expiresAt: 0,
+      });
+      changed = true;
+    }
+    if (changed) {
+      D.weatherNotifs = D.weatherNotifs.sort((a, b) => b.at - a.at).slice(0, 12);
+      emit('weatherNotif');
+    }
+  } catch (_) {}
 }
 
 window.onAndroidNotif = (action, payload) => {
@@ -519,16 +547,17 @@ window.onAndroidNotif = (action, payload) => {
   } catch (_) {}
 };
 
-export function toast(msg, kind = '', title = '', seconds = 2.6) {
+export function toast(msg, kind = '', title = '', seconds = 2.6, meta = null) {
   const durSec = Math.max(1, seconds);
   pushWeatherNotif({
-    source: 'pc',
-    app: title ? '' : 'PhoneBox',
+    key: meta?.key || null,
+    source: meta?.source || 'pc',
+    app: meta?.app || (title ? '' : 'PhoneBox'),
     title: title || '',
     text: msg || '',
     level: kind === 'err' ? 'error' : kind === 'ok' ? 'ok' : kind === 'warn' ? 'warn' : 'info',
-    at: Date.now(),
-    ttlMs: Math.max(8, durSec) * 1000,
+    at: meta?.at || Date.now(),
+    ttlMs: meta?.persist ? 0 : Math.max(12, durSec) * 1000,
   });
   // When the active page shows the under-weather notification slot, avoid showing a duplicate floating toast.
   if (hasVisibleWeatherNotifSlot()) return;
@@ -1247,9 +1276,11 @@ export function handleNotify(d) {
   const level = d.level === 'error' ? 'err' : d.level === 'ok' || d.level === 'success' ? 'ok' : d.level === 'warn' ? 'warn' : '';
   if (d.wake && nightOn) { wakeUntil = Date.now() + 30_000; setNight(false); }
   undim();
-  toast(d.text || '', level, d.title || '', d.seconds || 5);
+  const isWin = typeof d.key === 'string' && d.key.startsWith('win:');
+  toast(d.text || '', level, d.title || '', d.seconds || 20, { key: d.key, source: d.source || 'pc', app: d.app || '', at: d.at || Date.now(), persist: isWin });
   if (d.vibrate !== false) buzz(level === 'err' ? '0,90,90,90,90,160' : '0,70,110,70');
-  D.notes.unshift({ title: d.title || '', text: d.text || '', level: d.level || 'info', at: Date.now() });
+  const noteTitle = d.app && d.title && d.app.toLowerCase() !== d.title.toLowerCase() ? `${d.app} · ${d.title}` : (d.title || d.app || '');
+  D.notes.unshift({ title: noteTitle, text: d.text || '', level: d.level || 'info', at: d.at || Date.now() });
   D.notes = D.notes.slice(0, 30);
   store.set('notes', D.notes);
   emit('notes');
@@ -2506,7 +2537,7 @@ export let lastStateAt = 0;
 window.onAgentStream = (event, data) => {
   // the stream can send events before its first state (Program.cs sends the backlog first): an event that is only
   // new to this run would dispatch now and again when the replay delivers it — hold them until the state decides
-  if (event === 'open') { streamOn = true; evPre = []; return; }
+  if (event === 'open') { streamOn = true; evPre = []; loadPcNotifications(); return; }
   if (event === 'close') { streamOn = false; return; }
   let d;
   try { d = JSON.parse(data); } catch (_) { return; }
@@ -2629,6 +2660,7 @@ setTimeout(reportBattery, 5000);
 // index.html's boot watchdog waits for this: reaching the end of the module means the panel got through its first
 // render, so a throw anywhere above shows up as a message there instead of a black screen.
 initLiveBackground();
+loadPcNotifications();
 try {
   if (bridge && bridge.recentNotifs) {
     const initNotifs = JSON.parse(bridge.recentNotifs() || '[]');

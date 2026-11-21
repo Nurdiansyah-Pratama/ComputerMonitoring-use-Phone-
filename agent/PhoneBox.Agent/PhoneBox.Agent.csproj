@@ -26,6 +26,7 @@
 
   <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
     <PackageReference Include="NAudio" Version="3.3.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.4" />
   </ItemGroup>
 
   <PropertyGroup Condition="!$(TargetFramework.Contains('-windows'))">
