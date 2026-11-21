@@ -20,7 +20,21 @@ try { firstInstance = single.WaitOne(waitMs); }
 catch (AbandonedMutexException) { firstInstance = true; }
 if (!firstInstance)
 {
-    try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo($"http://127.0.0.1:{Port}/") { UseShellExecute = true }); } catch { }
+    var signaled = false;
+#if WINDOWS
+    try
+    {
+        if (EventWaitHandle.TryOpenExisting($"PhoneBox_ShowWindow_{Port}", out var showEvt))
+        {
+            using (showEvt) { showEvt.Set(); signaled = true; }
+        }
+    }
+    catch { }
+#endif
+    if (!signaled)
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo($"http://127.0.0.1:{Port}/") { UseShellExecute = true }); } catch { }
+    }
     return;
 }
 

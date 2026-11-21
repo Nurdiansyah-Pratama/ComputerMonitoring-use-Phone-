@@ -27,6 +27,7 @@
   <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
     <PackageReference Include="NAudio" Version="3.3.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
   </ItemGroup>
 
   <PropertyGroup Condition="!$(TargetFramework.Contains('-windows'))">
@@ -40,7 +41,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="!$(TargetFramework.Contains('-windows'))">
-    <Compile Remove="Tray.cs;JobObject.cs;AudioControl.cs;MediaMonitor.cs" />
+    <Compile Remove="Tray.cs;MainWindow.cs;JobObject.cs;AudioControl.cs;MediaMonitor.cs" />
   </ItemGroup>
 
   <ItemGroup>
