@@ -963,6 +963,12 @@ app.MapPost("/api/procs/kill", (string? name, int? pid, ProcessMonitor procs, Co
 app.MapPost("/api/run/{id}", (string id, bool? hold, ConfigStore cfg, PushStore push, AudioControl audio, ILogger<Program> log) =>
     RunShortcutForPhone(cfg.Get(), id, log, push, audio, hold == true));
 
+app.MapPost("/api/run/{id}/close", (string id, ConfigStore cfg, ILogger<Program> log) =>
+{
+    var (closed, error) = Shortcuts.Close(cfg.Get(), id, log);
+    return error is not null ? Results.Problem(HintOrGeneric(error)) : Results.Json(new { ok = true, closed });
+});
+
 // Real icon for a shortcut: an image the user uploaded (settings page) takes priority; otherwise its program's own
 // icon, when its command is an actual file on disk. 404 when neither exists (shell addresses, protocol handlers,
 // URLs, builtin: commands, and App Execution Alias stubs with no icon of their own), so the phone shows the emoji.

@@ -83,7 +83,7 @@ public sealed class AgentConfig
         shortcuts = Shortcuts.Select(s =>
         {
             var pic = shortcutIcon?.Invoke(s);
-            return new { s.Id, s.Label, s.Icon, s.Color, toggle = s.Toggle || s.Cmd == "builtin:mute", hold = s.LongPress is not null, cycle = s.Cmd == "builtin:cycle" && s.Cycle is { Count: > 0 }, iconRev = pic?.Rev, iconUpload = pic?.Upload == true };
+            return new { s.Id, s.Label, s.Icon, s.Color, toggle = s.Toggle || s.Cmd == "builtin:mute", hold = s.LongPress is not null, cycle = s.Cmd == "builtin:cycle" && s.Cycle is { Count: > 0 }, closable = PhoneBox.Agent.Shortcuts.IsClosable(s), iconRev = pic?.Rev, iconUpload = pic?.Upload == true };
         }),
         // names only (for the Rules widget); what a rule matches on stays here
         rules = Rules.Select(r => new { r.Id, r.Name, r.Enabled, r.When }),

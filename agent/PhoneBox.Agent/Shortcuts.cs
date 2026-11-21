@@ -11,6 +11,191 @@ public static class Shortcuts
 {
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> Remembered = new();
 
+    /// <summary>True for app/URL shortcuts that can be closed from the tile's corner × button (never system actions like mute/lock).</summary>
+    public static bool IsClosable(Shortcut sc) =>
+        !string.IsNullOrWhiteSpace(sc.Cmd)
+        && !sc.Cmd.Trim().StartsWith("builtin:", StringComparison.OrdinalIgnoreCase);
+
+    private static readonly HashSet<string> ProtectedProcesses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "explorer", "svchost", "csrss", "winlogon", "lsass", "dwm", "smss", "services", "system", "phoneboxagent"
+    };
+
+    /// <summary>Resolves process names to close for a shortcut command ("__explorer_windows__" means close File Explorer windows via COM).</summary>
+    internal static string[] ResolveCloseTargets(string cmd, string? defaultBrowserProc = null)
+    {
+        var raw = (cmd ?? "").Trim().Trim('"');
+        if (string.IsNullOrEmpty(raw) || raw.StartsWith("builtin:", StringComparison.OrdinalIgnoreCase)) return [];
+        var lower = raw.ToLowerInvariant();
+        if (lower is "explorer.exe" or "explorer" || lower.EndsWith(@"\explorer.exe", StringComparison.Ordinal))
+            return ["__explorer_windows__"];
+        if (lower is "wt.exe" or "wt" || lower.Contains("windowsterminal", StringComparison.Ordinal))
+            return ["WindowsTerminal"];
+        if (lower.StartsWith("ms-settings:", StringComparison.Ordinal))
+            return ["SystemSettings"];
+        if (lower.StartsWith("ms-screenclip:", StringComparison.Ordinal))
+            return ["SnippingTool", "ScreenClippingHost"];
+        if (lower is "calc.exe" or "calc" || lower.EndsWith(@"\calc.exe", StringComparison.Ordinal))
+            return ["CalculatorApp", "Calculator"];
+        if (lower is "taskmgr.exe" or "taskmgr" || lower.EndsWith(@"\taskmgr.exe", StringComparison.Ordinal))
+            return ["Taskmgr"];
+        if (lower.StartsWith("http://", StringComparison.Ordinal) || lower.StartsWith("https://", StringComparison.Ordinal))
+            return !string.IsNullOrWhiteSpace(defaultBrowserProc) ? [defaultBrowserProc] : ["msedge", "chrome", "brave", "firefox"];
+        if (lower.StartsWith("shell:appsfolder\\", StringComparison.Ordinal))
+        {
+            if (lower.Contains("spotify", StringComparison.Ordinal)) return ["Spotify"];
+            if (lower.Contains("visualstudiocode", StringComparison.Ordinal)) return ["Code"];
+            if (lower.Contains("windowsterminal", StringComparison.Ordinal)) return ["WindowsTerminal"];
+            if (lower.Contains("whatsapp", StringComparison.Ordinal)) return ["WhatsApp"];
+            if (lower.Contains("discord", StringComparison.Ordinal)) return ["Discord"];
+            if (lower.Contains("telegram", StringComparison.Ordinal)) return ["Telegram"];
+            if (lower.Contains("calculator", StringComparison.Ordinal)) return ["CalculatorApp", "Calculator"];
+            var afterBang = raw.Split('!').LastOrDefault()?.Trim();
+            if (!string.IsNullOrWhiteSpace(afterBang) && !afterBang.Equals("App", StringComparison.OrdinalIgnoreCase))
+                return [afterBang];
+            return [];
+        }
+        var name = Path.GetFileNameWithoutExtension(raw);
+        if (string.IsNullOrWhiteSpace(name) || ProtectedProcesses.Contains(name)) return [];
+        return [name];
+    }
+
+    /// <summary>Closes the application associated with shortcut [id].</summary>
+    public static (int Closed, string? Error) Close(AgentConfig cfg, string id, ILogger log)
+    {
+        var sc = cfg.Shortcuts.FirstOrDefault(s => s.Id == id);
+        if (sc is null) return (0, $"no such shortcut: {id}");
+        if (!IsClosable(sc)) return (0, null);
+
+        try
+        {
+            var targets = ResolveCloseTargets(sc.Cmd, DefaultBrowserProcessName());
+            var closed = 0;
+            foreach (var target in targets)
+            {
+#if WINDOWS
+                if (target == "__explorer_windows__")
+                {
+                    closed += CloseExplorerWindows();
+                    continue;
+                }
+#endif
+                if (ProtectedProcesses.Contains(target)) continue;
+                var procs = Process.GetProcessesByName(target);
+                try
+                {
+                    var graceful = new List<Process>();
+                    foreach (var p in procs)
+                    {
+                        try
+                        {
+                            if (p.HasExited) continue;
+                            if (p.MainWindowHandle != 0 && p.CloseMainWindow())
+                            {
+                                graceful.Add(p);
+                                closed++;
+                            }
+                        }
+                        catch { }
+                    }
+                    // For apps without a standard Win32 main window (UWP / tray / elevated) or that didn't close gracefully
+                    if (graceful.Count == 0 && procs.Length > 0)
+                    {
+                        foreach (var p in procs)
+                        {
+                            try
+                            {
+                                if (p.HasExited) continue;
+                                p.Kill(entireProcessTree: false);
+                                closed++;
+                            }
+                            catch { }
+                        }
+                    }
+                }
+                finally
+                {
+                    foreach (var p in procs) p.Dispose();
+                }
+            }
+            log.LogInformation("shortcut close: {Label} ({Closed} closed)", sc.Label, closed);
+            return (closed, null);
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning("shortcut close {Label} failed: {Msg}", sc.Label, ex.Message);
+            return (0, ex.Message);
+        }
+    }
+
+    private static string? DefaultBrowserProcessName()
+    {
+#if WINDOWS
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice");
+            var progId = key?.GetValue("ProgId")?.ToString() ?? "";
+            if (progId.Contains("Edge", StringComparison.OrdinalIgnoreCase)) return "msedge";
+            if (progId.Contains("Chrome", StringComparison.OrdinalIgnoreCase)) return "chrome";
+            if (progId.Contains("Brave", StringComparison.OrdinalIgnoreCase)) return "brave";
+            if (progId.Contains("Firefox", StringComparison.OrdinalIgnoreCase)) return "firefox";
+            if (progId.Contains("Opera", StringComparison.OrdinalIgnoreCase)) return "opera";
+        }
+        catch { }
+#endif
+        return null;
+    }
+
+#if WINDOWS
+    private static int CloseExplorerWindows()
+    {
+        var count = 0;
+        void Run()
+        {
+            try
+            {
+                var shellType = Type.GetTypeFromProgID("Shell.Application");
+                if (shellType is null) return;
+                dynamic? shell = Activator.CreateInstance(shellType);
+                if (shell is null) return;
+                try
+                {
+                    dynamic windows = shell.Windows();
+                    var list = new List<dynamic>();
+                    int n = windows.Count;
+                    for (var i = 0; i < n; i++)
+                    {
+                        try
+                        {
+                            dynamic? w = windows.Item(i);
+                            if (w is not null) list.Add(w);
+                        }
+                        catch { }
+                    }
+                    foreach (var w in list)
+                    {
+                        try { w.Quit(); count++; } catch { }
+                    }
+                }
+                finally
+                {
+                    try { Marshal.FinalReleaseComObject(shell); } catch { }
+                }
+            }
+            catch { }
+        }
+        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA) Run();
+        else
+        {
+            var t = new Thread(Run) { IsBackground = true };
+            t.SetApartmentState(ApartmentState.STA);
+            t.Start();
+            t.Join(4000);
+        }
+        return count;
+    }
+#endif
+
     /// <returns>An error message, or null on success.</returns>
     public static string? Run(AgentConfig cfg, string id, ILogger log, PushStore? push = null, AudioControl? audio = null, bool hold = false)
     {

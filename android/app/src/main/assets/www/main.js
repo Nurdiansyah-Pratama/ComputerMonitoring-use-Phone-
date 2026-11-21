@@ -858,9 +858,25 @@ export async function runShortcut(btn, id, hold = false) {
 
 /** A shortcut key. The Big button's options: with `cover`, a picture the user uploaded becomes the key's background
  *  instead of the centred icon; without `label`, the key shows no name (screen readers still get it). */
+export async function closeShortcut(b, closeBtn, id) {
+  haptic();
+  closeBtn.classList.add('busy');
+  try {
+    await api(`/run/${encodeURIComponent(id)}/close`, 'POST', 6000);
+    b.classList.add('closed-ok');
+    setTimeout(() => b.classList.remove('closed-ok'), 650);
+  } catch (e) {
+    b.classList.add('err');
+    setTimeout(() => b.classList.remove('err'), 800);
+  } finally {
+    closeBtn.classList.remove('busy');
+  }
+}
+
 export function keyButton(s, { cover = false, label = true } = {}) {
-  const icon = h('span', 'k-icon', s.icon ? rich(s.icon) : '•');
-  const b = h('button', 'key' + (s.toggle ? ' toggle' : '') + (s.cycle ? ' cycle' : '') + (label ? '' : ' k-nolabel'), icon, h('span', 'k-label', s.label));
+  const iconEl = h('span', 'k-icon', s.icon ? rich(s.icon) : '•');
+  const closable = s.closable === true;
+  const b = h('button', 'key' + (s.toggle ? ' toggle' : '') + (s.cycle ? ' cycle' : '') + (closable ? ' has-close' : '') + (label ? '' : ' k-nolabel'), iconEl, h('span', 'k-label', s.label));
   // The agent accepts a blank label, and a filled key hides its icon, so the id keeps the button named when no text
   // is shown; visible text names it otherwise.
   const name = String(s.label || '').trim();
@@ -868,12 +884,24 @@ export function keyButton(s, { cover = false, label = true } = {}) {
   b.style.setProperty('--k', s.color || '#6b7280');
   b.dataset.id = s.id;
   b._cover = cover;
+  if (closable) {
+    const xBtn = h('span', 'k-close', icon('x'));
+    xBtn.setAttribute('role', 'button');
+    xBtn.setAttribute('aria-label', `Close ${name || s.id}`);
+    xBtn.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+    xBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeShortcut(b, xBtn, s.id);
+    });
+    b.append(xBtn);
+  }
   if (s.hold) holdToRun(b, s.id);
   else b.addEventListener('click', () => runShortcut(b, s.id));
   // Only an upload fills the key: a program's own icon is 32 px on Windows, 64 px on macOS, and on Linux whatever logo
   // the icon theme has, none of them a picture the user chose for the button. The agent says which is which, since the
   // picture's size cannot tell (an SVG reports a default size, often 24 px from an icon set).
-  if (s.iconRev != null) applyShortcutIcon(b, icon, s.id, cover && s.iconUpload === true);
+  if (s.iconRev != null) applyShortcutIcon(b, iconEl, s.id, cover && s.iconUpload === true);
   return b;
 }
 
