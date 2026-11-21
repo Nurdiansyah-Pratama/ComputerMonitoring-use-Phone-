@@ -266,7 +266,8 @@ public static class Shortcuts
                     PostMessage(0xFFFF, 0x0112, 0xF170, 2);
                     break;
                 case "builtin:mute":
-                    Keys.Tap(Keys.VK_VOLUME_MUTE);
+                    if ((audio ?? new AudioControl()).ToggleMute()) StateSignal.Poke();
+                    else Keys.Tap(Keys.VK_VOLUME_MUTE);
                     break;
 #else
                 case "builtin:lock":
@@ -298,13 +299,14 @@ public static class Shortcuts
 
     private static void Start(Shortcut sc)
     {
-        var psi = new ProcessStartInfo(Home(sc.Cmd), Home(sc.Args ?? "")) { UseShellExecute = true };
-        if (!string.IsNullOrEmpty(sc.Cwd)) psi.WorkingDirectory = Home(sc.Cwd);
+        var file = Home(sc.Cmd);
+        var args = Home(sc.Args ?? "");
+        var cwd = string.IsNullOrEmpty(sc.Cwd) ? null : Home(sc.Cwd);
 #if WINDOWS
         LetTheNewWindowComeForward();
         try
         {
-            Process.Start(psi);
+            ShellLaunchWindows(file, args, cwd);
         }
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 2 /* not found */ && TerminalStandIns(sc.Cmd)
             .Select(t => Path.Combine(Environment.SystemDirectory, t == "powershell.exe" ? @"WindowsPowerShell\v1.0\powershell.exe" : t))
@@ -313,6 +315,8 @@ public static class Shortcuts
             StartStandIn(alt, sc);
         }
 #else
+        var psi = new ProcessStartInfo(file, args) { UseShellExecute = true };
+        if (cwd is not null) psi.WorkingDirectory = cwd;
         // a missing program does not throw here: .NET hands the name to xdg-open, which fails on its own
         if (TerminalStandIns(sc.Cmd, Environment.GetEnvironmentVariable("TERMINAL")) is { Length: > 0 } alts && Sh.Which(sc.Cmd) is null
             && alts.Select(Sh.Which).FirstOrDefault(p => p is not null) is { } alt)
@@ -368,6 +372,67 @@ public static class Shortcuts
     {
         try { if (KeySender.NudgeInput()) AllowSetForegroundWindow(-1 /* ASFW_ANY */); } catch { }
     }
+
+    /// <summary>
+    /// Runs ShellExecuteExW on an STA thread with explicit SW_SHOWNORMAL so Win32 apps (wt.exe, explorer.exe,
+    /// taskmgr.exe, URLs, shell:AppsFolder\...) always open visibly in the foreground, never inheriting SW_HIDE or
+    /// failing on ASP.NET Core's MTA thread pool.
+    /// </summary>
+    private static void ShellLaunchWindows(string file, string args, string? cwd)
+    {
+        Exception? failure = null;
+        void Launch()
+        {
+            var info = new SHELLEXECUTEINFO
+            {
+                cbSize = Marshal.SizeOf<SHELLEXECUTEINFO>(),
+                fMask = 0x00000100 /* SEE_MASK_NOASYNC */,
+                lpVerb = null, // default verb (handles runas manifest for taskmgr.exe and open for URLs/apps)
+                lpFile = file,
+                lpParameters = string.IsNullOrEmpty(args) ? null : args,
+                lpDirectory = cwd,
+                nShow = 1 /* SW_SHOWNORMAL */,
+            };
+            if (!ShellExecuteExW(ref info))
+                failure = new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+        {
+            Launch();
+        }
+        else
+        {
+            var t = new Thread(Launch) { IsBackground = true };
+            t.SetApartmentState(ApartmentState.STA);
+            t.Start();
+            t.Join(10_000);
+        }
+        if (failure is not null) throw failure;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct SHELLEXECUTEINFO
+    {
+        public int cbSize;
+        public uint fMask;
+        public nint hwnd;
+        public string? lpVerb;
+        public string? lpFile;
+        public string? lpParameters;
+        public string? lpDirectory;
+        public int nShow;
+        public nint hInstApp;
+        public nint lpIDList;
+        public string? lpClass;
+        public nint hkeyClass;
+        public uint dwHotKey;
+        public nint hIconOrMonitor;
+        public nint hProcess;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool ShellExecuteExW(ref SHELLEXECUTEINFO lpExecInfo);
     [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(int processId);
     [DllImport("user32.dll")] private static extern bool LockWorkStation();
     [DllImport("user32.dll")] private static extern bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
