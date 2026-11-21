@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.AlertDialog
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -14,6 +15,10 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.BatteryManager
 import android.os.SystemClock
 import android.os.Bundle
@@ -62,6 +67,24 @@ class MainActivity : Activity(), SensorEventListener {
     private var lastLux = -1f
     private var lastLuxAt = 0L
     private var near: Boolean? = null
+    private var wifiCallbackRegistered = false
+    private var powerReceiverRegistered = false
+
+    private val wifiCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            link.onNetworkChanged()
+            if (resumed && link.route == AgentLink.Route.NONE) stream.reconnectNow()
+        }
+    }
+
+    private val powerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_POWER_CONNECTED) {
+                link.onUsbPlugged()
+                if (resumed && link.route != AgentLink.Route.USB) stream.reconnectNow()
+            }
+        }
+    }
 
     private val assetLoader by lazy {
         WebViewAssetLoader.Builder()
@@ -234,9 +257,51 @@ class MainActivity : Activity(), SensorEventListener {
         web.onResume()
         web.evaluateJavascript("window.onAppPause && window.onAppPause(false)", null) // the panel catches up at once
         stream.start()
+        registerConnectivityWatchers()
+        PhoneNotifListener.listener = { action, payload ->
+            val js = "window.onAndroidNotif && window.onAndroidNotif(${JSONObject.quote(action)}, $payload)"
+            runOnUiThread { if (!destroyed) web.evaluateJavascript(js, null) }
+        }
         hideSystemUi()
         sensors?.getDefaultSensor(Sensor.TYPE_LIGHT)?.let { sensors?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
         sensors?.getDefaultSensor(Sensor.TYPE_PROXIMITY)?.let { sensors?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
+    }
+
+    private fun registerConnectivityWatchers() {
+        if (!wifiCallbackRegistered) {
+            try {
+                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
+                val req = NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build()
+                cm?.registerNetworkCallback(req, wifiCallback)
+                wifiCallbackRegistered = true
+            } catch (_: Exception) {}
+        }
+        if (!powerReceiverRegistered) {
+            try {
+                val filter = IntentFilter(Intent.ACTION_POWER_CONNECTED)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(powerReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                } else {
+                    @Suppress("DEPRECATION")
+                    registerReceiver(powerReceiver, filter)
+                }
+                powerReceiverRegistered = true
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun unregisterConnectivityWatchers() {
+        if (wifiCallbackRegistered) {
+            try {
+                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
+                cm?.unregisterNetworkCallback(wifiCallback)
+            } catch (_: Exception) {}
+            wifiCallbackRegistered = false
+        }
+        if (powerReceiverRegistered) {
+            try { unregisterReceiver(powerReceiver) } catch (_: Exception) {}
+            powerReceiverRegistered = false
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -249,6 +314,8 @@ class MainActivity : Activity(), SensorEventListener {
         resumed = false
         dictation.cancel(0) // the microphone is never left open behind another app or a dark screen
         sensors?.unregisterListener(this)
+        PhoneNotifListener.listener = null
+        unregisterConnectivityWatchers()
         stream.stop()
         // WebView.onPause() leaves JavaScript running: tell the panel to stop polling and refreshing while nobody sees it
         web.evaluateJavascript("window.onAppPause && window.onAppPause(true)", null)
@@ -261,6 +328,7 @@ class MainActivity : Activity(), SensorEventListener {
         resumed = false
         dictation.cancel(0)
         sensors?.unregisterListener(this)
+        unregisterConnectivityWatchers()
         stream.stop()
         link.trackpadSocket.close()
         link.close()
@@ -441,6 +509,13 @@ class MainActivity : Activity(), SensorEventListener {
 
         @JavascriptInterface
         fun forgetPc(key: String, id: String) { if (ok(key)) link.forget(id) }
+
+        /** Active Android notifications for the under-weather notification slot. */
+        @JavascriptInterface
+        fun recentNotifs(key: String): String = if (ok(key)) PhoneNotifListener.snapshotJson() else "[]"
+
+        @JavascriptInterface
+        fun dismissNotif(key: String, notifKey: String) { if (ok(key)) PhoneNotifListener.dismiss(notifKey) }
 
         /** True when the Wake button can work: the active computer's MACs are known and the phone is on a local network. */
         @JavascriptInterface

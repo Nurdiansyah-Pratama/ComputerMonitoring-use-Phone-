@@ -31,6 +31,7 @@ public sealed class SpectrumAnalyzer(ConfigStore config, ILogger<SpectrumAnalyze
     private const double SlopeDbPerOctave = 3;      // music falls off towards the treble; lift it so the bars look even
 
     private long _wantedUntil;
+    private long _ambientUntil;
     private volatile int[]? _frame;
 
     private static long Now => Environment.TickCount64;
@@ -44,13 +45,15 @@ public sealed class SpectrumAnalyzer(ConfigStore config, ILogger<SpectrumAnalyze
     public bool Shown() => config.Get().Widgets(enabledPagesOnly: true).Any(w => w.Type == WidgetType);
 
     /// <summary>
-    /// A panel shows a visualizer: start capture (if needed) and keep it going for a few seconds. Refused (false) when no
-    /// enabled page has the widget, so removing or hiding the widget turns capture off.
+    /// A panel shows a visualizer (or the live audio-reactive background): start capture (if needed) and keep it going
+    /// for a few seconds. When <paramref name="ambient"/> is false, refused unless an enabled page has the widget.
     /// </summary>
-    public bool Want()
+    public bool Want(bool ambient = false)
     {
-        if (!Shown()) return false;
-        Interlocked.Exchange(ref _wantedUntil, Now + KeepMs);
+        if (!ambient && !Shown()) return false;
+        var until = Now + KeepMs;
+        Interlocked.Exchange(ref _wantedUntil, until);
+        if (ambient) Interlocked.Exchange(ref _ambientUntil, until);
         Start();
         return true;
     }
@@ -316,7 +319,8 @@ public sealed class SpectrumAnalyzer(ConfigStore config, ILogger<SpectrumAnalyze
             // stop when no panel asked for a while, or the widget was removed or its page turned off since (the config
             // walk once a second is enough for that)
             var everySecond = ++_tickCount % Fps == 0;
-            if (Now >= Interlocked.Read(ref _wantedUntil) || (everySecond && !Shown())) { Stop(); return; }
+            var ambientActive = Now < Interlocked.Read(ref _ambientUntil);
+            if (Now >= Interlocked.Read(ref _wantedUntil) || (everySecond && !ambientActive && !Shown())) { Stop(); return; }
             // loopback stays on the device it was opened on: follow the user to a new default output (speakers to
             // headphones), or the bars would sit flat while the new device plays
             if (everySecond && DefaultOutputId() is { } id && id != _deviceId) { Stop("default output changed"); Start(); return; }

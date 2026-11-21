@@ -16,6 +16,8 @@ import './widgets/console.js';
 import './widgets/dictate.js';
 import './widgets/camera.js';
 import './widgets/spectrum.js';
+import { extractPalette, initLiveBackground } from './live-bg.js';
+export { extractPalette };
 
 // PhoneBox desk panel. Pages are 12 × 6 grids of widgets, designed in the agent's settings page.
 // The panel talks to the PhoneBox agent through "/agent/*", which the Android shell proxies over USB
@@ -53,7 +55,7 @@ export const $ = (id) => document.getElementById(id);
 // The native bridge (window.Android) is in every frame, sandboxed widgets included, so each call carries a key that only
 // the panel's own frames receive (MainActivity.bridgeKey). This wrapper adds it.
 const BRIDGE = ['battery', 'buzz', 'haptic', 'is24Hour', 'pcs', 'selectPc', 'forgetPc', 'setBrightness', 'setHomeScreen', 'setOrientation',
-  'setPinned', 'setVolumeKeys', 'transport', 'sensors', 'version', 'canListen', 'listen', 'stopListening', 'cancelListening', 'trackpad', 'canWake', 'wakePc'];
+  'setPinned', 'setVolumeKeys', 'transport', 'sensors', 'version', 'canListen', 'listen', 'stopListening', 'cancelListening', 'trackpad', 'canWake', 'wakePc', 'recentNotifs', 'dismissNotif'];
 export const bridge = typeof Android === 'undefined' ? null : Object.fromEntries(BRIDGE.filter((m) => typeof Android[m] === 'function')
   .map((m) => [m, (...args) => Android[m](window.__phoneboxKey || '', ...args)]));
 // Live preview inside the agent's layout editor: the layout comes from the editor (unsaved), not from the agent.
@@ -121,7 +123,7 @@ const evOffer = (e) => {          // one event from the stream or a state answer
 export let pushVersion = null;
 
 /** Latest data from the agent and the web; widgets read from here. */
-export const D = { state: null, quotas: null, work: null, procs: null, push: {}, weather: null, calendar: null, notes: store.get('notes', []) };
+export const D = { state: null, quotas: null, work: null, procs: null, push: {}, weather: null, calendar: null, notes: store.get('notes', []), weatherNotifs: [] };
 
 export const HIST = 90;
 export const hist = { cpu: [], gpu: [], ram: [], vram: [], down: [], up: [], ping: [], gputemp: [], cputemp: [], hotspot: [], gpupower: [], gpuclock: [] };
@@ -452,14 +454,91 @@ export const cssVar = (name) => getComputedStyle(document.documentElement).getPr
 export const color = (c) => (c && c.startsWith('--') ? cssVar(c) : c);
 
 export let toastTimer = 0;
+let wxNotifSeq = 0;
+
+function hasVisibleWeatherNotifSlot() {
+  const cur = pages[curPage];
+  if (!cur) return false;
+  return !!document.querySelector(`.page[data-page="${cur.id}"] .wx-notif-host`);
+}
+
+export function pushWeatherNotif({ key, source = 'pc', app = '', title = '', text = '', level = 'info', at = Date.now(), ttlMs = 0 }) {
+  const k = key || `pb:${++wxNotifSeq}`;
+  const item = {
+    key: k,
+    source,
+    app: app || (source === 'pc' ? 'PhoneBox' : ''),
+    title: title || '',
+    text: text || '',
+    level: level || 'info',
+    at: at || Date.now(),
+    expiresAt: ttlMs > 0 ? Date.now() + ttlMs : 0,
+  };
+  if (!item.title && !item.text) return;
+  D.weatherNotifs = [item, ...D.weatherNotifs.filter((x) => x.key !== k)].slice(0, 12);
+  emit('weatherNotif');
+  if (item.expiresAt > 0) {
+    setTimeout(() => {
+      const before = D.weatherNotifs.length;
+      D.weatherNotifs = D.weatherNotifs.filter((x) => x.key !== k || x.expiresAt > Date.now());
+      if (D.weatherNotifs.length !== before) emit('weatherNotif');
+    }, ttlMs + 150);
+  }
+}
+
+export function dismissWeatherNotif(key) {
+  const found = D.weatherNotifs.find((x) => x.key === key);
+  D.weatherNotifs = D.weatherNotifs.filter((x) => x.key !== key);
+  if (found && found.source === 'android') {
+    try { bridge && bridge.dismissNotif && bridge.dismissNotif(key); } catch (_) {}
+  }
+  emit('weatherNotif');
+}
+
+window.onAndroidNotif = (action, payload) => {
+  try {
+    if (action === 'sync' && Array.isArray(payload)) {
+      const pcItems = D.weatherNotifs.filter((x) => x.source !== 'android');
+      const androidItems = payload.map((p) => ({
+        key: p.key, source: 'android', app: p.app || 'Phone', title: p.title || '', text: p.text || '',
+        level: 'info', at: p.at || Date.now(), expiresAt: 0,
+      }));
+      D.weatherNotifs = [...androidItems, ...pcItems].sort((a, b) => b.at - a.at).slice(0, 12);
+      emit('weatherNotif');
+    } else if (action === 'post' && payload && payload.key) {
+      undim();
+      pushWeatherNotif({
+        key: payload.key, source: 'android', app: payload.app || 'Phone',
+        title: payload.title || '', text: payload.text || '', level: 'info',
+        at: payload.at || Date.now(), ttlMs: 0,
+      });
+    } else if (action === 'remove' && payload && payload.key) {
+      D.weatherNotifs = D.weatherNotifs.filter((x) => x.key !== payload.key);
+      emit('weatherNotif');
+    }
+  } catch (_) {}
+};
+
 export function toast(msg, kind = '', title = '', seconds = 2.6) {
+  const durSec = Math.max(1, seconds);
+  pushWeatherNotif({
+    source: 'pc',
+    app: title ? '' : 'PhoneBox',
+    title: title || '',
+    text: msg || '',
+    level: kind === 'err' ? 'error' : kind === 'ok' ? 'ok' : kind === 'warn' ? 'warn' : 'info',
+    at: Date.now(),
+    ttlMs: Math.max(8, durSec) * 1000,
+  });
+  // When the active page shows the under-weather notification slot, avoid showing a duplicate floating toast.
+  if (hasVisibleWeatherNotifSlot()) return;
   const t = $('toast');
   const ic = { ok: 'check', err: 'err', warn: 'warn' }[kind] || 'info';
   const msgSpan = h('span', null, icon(ic, 'm'), msg);
   t.replaceChildren(...(title ? [h('b', null, rich(title)), msgSpan] : [msgSpan]));
   t.className = 'toast on ' + kind;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.className = 'toast ' + kind), Math.max(1, seconds) * 1000);
+  toastTimer = setTimeout(() => (t.className = 'toast ' + kind), durSec * 1000);
 }
 
 // ---------------------------------------------------------------- charts
@@ -866,7 +945,13 @@ export const setMediaState = (m) => {
 export let DEFAULT_AMBIENT = '45, 212, 191';
 export let artTint = true;
 export let currentArtColor = null;
-export const setArtColor = (c) => { currentArtColor = c; setAmbient(c); };
+export let currentArtPalette = null;
+export const setArtColor = (c, palette = null) => {
+  currentArtColor = c;
+  currentArtPalette = palette;
+  setAmbient(c);
+  window.dispatchEvent(new CustomEvent('phonebox-palette', { detail: artTint ? palette : null }));
+};
 export const hexToRgb = (hex) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return null; const n = parseInt(m[1], 16); return `${n >> 16}, ${(n >> 8) & 255}, ${n & 255}`; };
 
 export function averageColor(img) {
@@ -2219,7 +2304,10 @@ export function applyDisplay() {
   DEFAULT_AMBIENT = accent || '45, 212, 191';
   document.documentElement.style.setProperty('--accent', `rgb(${DEFAULT_AMBIENT})`);
   artTint = d.artTint !== false;
-  if (before !== DEFAULT_AMBIENT || !artTint) setAmbient(artTint ? currentArtColor : null);
+  if (before !== DEFAULT_AMBIENT || !artTint) {
+    setAmbient(artTint ? currentArtColor : null);
+    window.dispatchEvent(new CustomEvent('phonebox-palette', { detail: artTint ? currentArtPalette : null }));
+  }
   if (langChanged) { buildLayout(); renderApproval(); }
   renderRulesBtn();
   if (PREVIEW || !bridge) return;
@@ -2437,6 +2525,7 @@ export const idle = () => appPaused || document.hidden;
 window.onAppPause = (paused) => {
   const was = idle();
   appPaused = !!paused;
+  window.dispatchEvent(new CustomEvent('phonebox-app-pause', { detail: appPaused }));
   if (was && !idle()) wokeUp();
 };
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !appPaused) wokeUp(); });
@@ -2539,6 +2628,13 @@ setTimeout(reportBattery, 5000);
 
 // index.html's boot watchdog waits for this: reaching the end of the module means the panel got through its first
 // render, so a throw anywhere above shows up as a message there instead of a black screen.
+initLiveBackground();
+try {
+  if (bridge && bridge.recentNotifs) {
+    const initNotifs = JSON.parse(bridge.recentNotifs() || '[]');
+    if (Array.isArray(initNotifs) && initNotifs.length) window.onAndroidNotif('sync', initNotifs);
+  }
+} catch (_) {}
 window.__pbUp = true;
 // A slow module graph can still arrive after the watchdog spoke: with the boot warning left in place the panel would
 // report a failure while working normally.

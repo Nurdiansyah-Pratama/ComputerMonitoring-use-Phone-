@@ -1,4 +1,4 @@
-import { $, API, D, LEVEL_COLOR, LOCALE, mediaHtml, METRICS, PANEL_HEADERS, PREVIEW, Q_STYLE, S_ORDER, ago, api, averageColor, buildLayout, buzz, cfg, chime, cfgVersion, chart, color, cssVar, currentProcessesSort, emit, fillIcon, fmtClock, fmtDur, fmtHM, fmtMem, fmtReset, fmtTime, fmtValue, gotoProcesses, gpuMem, gpusOf, h, en, haptic, hasProcessesPage, hist, hour12, icon, keyButton, setKeyFace, labelled, levelOf, media, metricText, online, openSheet, paceInfo, pad, prRow, pushView, quotaProviders, r1, registerProcessesSorter, renderStatus, ringSvg, setArtColor, configMark, configReadSince, localWriteStored, setMediaState, setVolDragging, shortDur, shortGpu, store, t, tick, toast, volDragging, wxBlock, wxDeg, wxIcon, emo, rich, tp, tpv, quotaText } from '../main.js';
+import { $, API, D, LEVEL_COLOR, LOCALE, mediaHtml, METRICS, PANEL_HEADERS, PREVIEW, Q_STYLE, S_ORDER, ago, api, averageColor, buildLayout, buzz, cfg, chime, cfgVersion, chart, color, cssVar, currentProcessesSort, dismissWeatherNotif, emit, extractPalette, fillIcon, fmtClock, fmtDur, fmtHM, fmtMem, fmtReset, fmtTime, fmtValue, gotoProcesses, gpuMem, gpusOf, h, en, haptic, hasProcessesPage, hist, hour12, icon, keyButton, setKeyFace, labelled, levelOf, media, metricText, online, openSheet, paceInfo, pad, prRow, pushView, quotaProviders, r1, registerProcessesSorter, renderStatus, ringSvg, setArtColor, configMark, configReadSince, localWriteStored, setMediaState, setVolDragging, shortDur, shortGpu, store, t, tick, toast, volDragging, wxBlock, wxDeg, wxIcon, emo, rich, tp, tpv, quotaText } from '../main.js';
 import { W } from '../registry.js';
 import { invalidateDeckState } from './controls.js';
 
@@ -17,14 +17,64 @@ function bindProcessLink(box, sortTarget) {
 // Data kinds: tick (every second), fast (4×/s), state, weather, quotas, work, procs, push, notes.
 
 W.clock = {
-  bare: true, needs: ['tick', 'state', 'weather', 'quotas', 'work'],
+  bare: true, needs: ['tick', 'state', 'weather', 'quotas', 'work', 'weatherNotif'],
   create(box, { o }) {
     const status = o.status !== false ? h('div', 'status') : null;
     const hh = h('span', 'hh', '--'), colon = h('span', 'colon', ':'), mm = h('span', 'mm', '--'), ss = h('span', 'sec'), ap = h('span', 'ap');
     const date = o.date !== false ? h('div', 'date') : null;
     const wx = o.weather !== false ? wxBlock() : null;
-    box.append(status || '', h('div', 'clock', hh, colon, mm, ss, ap), date || '', wx || '');
+    const notifHost = h('div', 'wx-notif-host');
+    notifHost.hidden = true;
+    let notifIdx = 0;
+
+    const renderNotif = () => {
+      const now = Date.now();
+      const active = (D.weatherNotifs || []).filter((x) => !x.expiresAt || x.expiresAt > now);
+      if (!active.length) {
+        notifHost.hidden = true;
+        notifHost.replaceChildren();
+        box.classList.remove('has-notif');
+        notifIdx = 0;
+        return;
+      }
+      if (notifIdx >= active.length) notifIdx = 0;
+      const item = active[notifIdx];
+      const levelCls = item.level === 'error' ? ' err' : item.level === 'ok' ? ' ok' : item.level === 'warn' ? ' warn' : '';
+      const headLabel = item.app && item.title && item.app.toLowerCase() !== item.title.toLowerCase()
+        ? `${item.app} · ${item.title}`
+        : (item.title || item.app || 'Notification');
+      const ageSec = Math.max(0, Math.floor((now - (item.at || now)) / 1000));
+      const ageText = ageSec < 45 ? 'now' : ageSec < 3600 ? `${Math.floor(ageSec / 60)}m` : `${Math.floor(ageSec / 3600)}h`;
+      const closeBtn = h('button', 'wx-n-close', icon('x'));
+      closeBtn.setAttribute('aria-label', 'Dismiss');
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        haptic();
+        dismissWeatherNotif(item.key);
+      });
+      const badge = active.length > 1 ? h('span', 'wx-n-badge', `${notifIdx + 1}/${active.length}`) : null;
+      const card = h('div', 'wx-notif' + levelCls,
+        h('span', 'wx-n-bar'),
+        h('span', 'wx-n-ico', icon(item.level === 'error' ? 'err' : item.level === 'ok' ? 'check' : item.level === 'warn' ? 'warn' : 'bell')),
+        h('div', 'wx-n-body',
+          h('div', 'wx-n-head', h('b', 'wx-n-title', headLabel), badge, h('span', 'wx-n-time', ageText)),
+          item.text ? h('div', 'wx-n-text', item.text) : null),
+        closeBtn);
+      card.addEventListener('click', () => {
+        if (active.length > 1) {
+          haptic();
+          notifIdx = (notifIdx + 1) % active.length;
+          renderNotif();
+        }
+      });
+      notifHost.replaceChildren(card);
+      notifHost.hidden = false;
+      box.classList.add('has-notif');
+    };
+
+    box.append(status || '', h('div', 'clock', hh, colon, mm, ss, ap), date || '', wx || '', notifHost);
     box.style.setProperty('--tf', (0.84 - (status ? 0.1 : 0) - (date ? 0.11 : 0) - (wx ? 0.2 : 0)).toFixed(2));
+    renderNotif();
     return {
       // without the weather line the clock must not make the panel fetch the weather
       needs: wx ? W.clock.needs : W.clock.needs.filter((k) => k !== 'weather'),
@@ -41,7 +91,9 @@ W.clock = {
           colon.classList.toggle('dim', now.getSeconds() % 2 === 1);
           if (date) date.textContent = now.toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' });
           if (status && now.getSeconds() % 30 === 0) renderStatus(status, o); // battery
+          if (!notifHost.hidden && now.getSeconds() % 15 === 0) renderNotif();
         } else if (kind === 'weather') wx?.update();
+        else if (kind === 'weatherNotif') { notifIdx = 0; renderNotif(); }
         else if (status) renderStatus(status, o);
       },
     };
@@ -116,7 +168,7 @@ W.media = {
       'Internet Radio': '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.2 6.8 18.5 2a1 1 0 0 1 .7 1.9L10.8 7H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h2.2zm1.8 5.2a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm6 1.5v1.8h4v-1.8h-4zm0 3.2v1.8h4v-1.8h-4z" fill="#38bdf8"/></svg>',
     };
     let artId = -1, volTimer = 0, volumeRelease = 0;
-    img.addEventListener('load', () => { img.classList.add('on'); setArtColor(averageColor(img)); });
+    img.addEventListener('load', () => { img.classList.add('on'); setArtColor(averageColor(img), extractPalette(img)); });
     img.addEventListener('error', () => img.classList.remove('on'));
     box.querySelectorAll('[data-media]').forEach((btn) => btn.addEventListener('click', async () => {
       haptic();

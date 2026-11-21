@@ -6,7 +6,7 @@ using PhoneBox.Agent;
 
 var endpoint = AgentEndpoint.FromArgs(args);
 var Port = endpoint.Port;
-string[] SameOrigins = [$"http://127.0.0.1:{Port}", $"http://localhost:{Port}"];
+string[] SameOrigins = [$"http://127.0.0.1:{Port}", $"http://localhost:{Port}", $"http://[::1]:{Port}"];
 
 // Install scripts ask where the agent belongs (it differs per OS), then copy it there.
 if (args.Contains("--print-install-dir")) { Console.WriteLine(AppPaths.InstallDir); return; }
@@ -49,6 +49,10 @@ builder.WebHost.ConfigureKestrel(k =>
     // percent-encoded, fit in 16 KB
     k.Limits.MaxRequestLineSize = 16 * 1024;
     k.Listen(IPAddress.Loopback, Port);
+    if (System.Net.Sockets.Socket.OSSupportsIPv6)
+    {
+        try { k.Listen(IPAddress.IPv6Loopback, Port); } catch { /* IPv6 loopback unavailable */ }
+    }
     // USB: the end of the phone's adb reverse tunnel, on a port of its own, over TLS the app pins, with the app's key
     k.Listen(IPAddress.Loopback, usb.Port, l => l.UseHttps(usbCert));
     // Wi-Fi / Tailscale: HTTPS with a pinned self-signed certificate, token required (see Lan.cs).
@@ -100,6 +104,8 @@ AddMonitor<SteamMonitor>(builder.Services);
 AddMonitor<BatteryMonitor>(builder.Services);
 AddMonitor<RuleEngine>(builder.Services);
 AddMonitor<ChargeGuard>(builder.Services);
+if (lanCert is not null)
+    builder.Services.AddHostedService(sp => new LanDiscovery(configStore, Lan.Fingerprint(lanCert), lanCfg.Port, sp.GetRequiredService<ILogger<LanDiscovery>>()));
 builder.Services.AddHostedService<Tray>();
 
 var app = builder.Build();
@@ -244,7 +250,7 @@ app.Use(async (ctx, next) =>
         var host = ctx.Request.Host.Host;
         var spotifyCallback = ctx.Request.Method == "GET" && ctx.Request.Path == "/api/controls/spotify/callback"
             && app.Services.GetRequiredService<SpotifyControl>().HasPendingState(ctx.Request.Query["state"]);
-        if ((host != "127.0.0.1" && host != "localhost") || (origin != "" && !SameOrigins.Contains(origin))
+        if ((host != "127.0.0.1" && host != "localhost" && host != "::1" && host != "[::1]") || (origin != "" && !SameOrigins.Contains(origin))
             || (!spotifyCallback && BrowserGuard.IsForeign(ctx.Request.Headers["Sec-Fetch-Site"], ctx.Request.Headers["Sec-Fetch-Mode"], ctx.Request.Method, ctx.Request.Path)))
         {
             ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
@@ -287,8 +293,8 @@ app.MapGet("/api/pair", (ConfigStore cfg) =>
     });
 });
 
-// The MAC addresses of this computer's LAN adapters: the phone keeps them to wake this PC while the agent is not running.
-app.MapGet("/api/wake/macs", () => Results.Json(new { macs = WakeOnLan.LocalMacs() }));
+// The MAC addresses and current LAN IPs of this computer: keeps Wake-on-LAN and Wi-Fi roaming fresh.
+app.MapGet("/api/wake/macs", () => Results.Json(new { macs = WakeOnLan.LocalMacs(), hosts = Lan.Addresses() }));
 
 // Pairing without USB (see PairingCodes). Start and cancel are local only (settings page); the phone claims over Wi-Fi.
 app.MapPost("/api/pair/start", (ConfigStore cfg, PairingCodes codes) =>
@@ -843,9 +849,10 @@ app.MapPost("/api/approvals/{id}", (string id, string decision, string? value, A
 // Spectrum bars widget: each call keeps audio capture running for a few seconds and returns the latest bands
 // (the live stream also sends them as "spectrum" events; panels without the stream poll this instead).
 // Only band levels leave the agent, never audio; nothing is captured unless an enabled page has the widget.
-app.MapGet("/api/spectrum", (SpectrumAnalyzer spectrum) =>
+app.MapGet("/api/spectrum", (SpectrumAnalyzer spectrum, string? ambient) =>
 {
-    var shown = spectrum.Want();
+    var isAmbient = ambient == "1" || string.Equals(ambient, "true", StringComparison.OrdinalIgnoreCase);
+    var shown = spectrum.Want(isAmbient);
     return Results.Json(new { shown, active = spectrum.Active, fps = SpectrumAnalyzer.Fps, b = shown ? spectrum.Frame() : null });
 });
 

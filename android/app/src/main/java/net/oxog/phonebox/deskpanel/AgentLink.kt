@@ -132,10 +132,28 @@ class AgentLink(private val context: Context) {
     @Volatile private var preferredHost = 0
     @Volatile private var factory: Pair<String, SSLSocketFactory>? = null
     @Volatile private var usbFactory: Pair<String, SSLSocketFactory>? = null // its own: the USB agent's pin may differ from the Wi-Fi PC's
+    @Volatile private var usbSkipUntil = 0L
+    @Volatile private var lastDiscoveryAt = 0L
+
+    /** Called when USB power is attached: try USB immediately on the next request/stream. */
+    fun onUsbPlugged() {
+        usbSkipUntil = 0L
+    }
+
+    /** Called when Wi-Fi network state changes: allow immediate LAN re-discovery if the PC's IP changed. */
+    fun onNetworkChanged() {
+        lastDiscoveryAt = 0L
+        preferredHost = 0
+        trackpadSocket.close()
+    }
+
+    private fun shouldTryUsb(): Boolean = route == Route.USB || System.currentTimeMillis() >= usbSkipUntil
 
     /** Opens a long-lived GET (the live stream) over the best route; null when the PC is unreachable. */
     fun stream(path: String): Pair<Route, Reply>? {
-        usb("GET", path, STREAM_READ_TIMEOUT)?.let { route = Route.USB; return Route.USB to it }
+        if (shouldTryUsb()) {
+            usb("GET", path, STREAM_READ_TIMEOUT)?.let { route = Route.USB; return Route.USB to it }
+        }
         wifi("GET", path, STREAM_READ_TIMEOUT)?.let { route = Route.WIFI; return Route.WIFI to it }
         return null
     }
@@ -144,10 +162,12 @@ class AgentLink(private val context: Context) {
     fun request(method: String, pathAndQuery: String): Reply = request(method, pathAndQuery, null, null)
 
     fun request(method: String, pathAndQuery: String, body: ByteArray?, contentType: String?): Reply {
-        usb(method, pathAndQuery, 4000, body, contentType)?.let {
-            route = Route.USB
-            maybePair()
-            return it
+        if (shouldTryUsb()) {
+            usb(method, pathAndQuery, 4000, body, contentType)?.let {
+                route = Route.USB
+                maybePair()
+                return it
+            }
         }
         wifi(method, pathAndQuery, 4000, body, contentType)?.let {
             route = Route.WIFI
@@ -231,8 +251,13 @@ class AgentLink(private val context: Context) {
             // the agent doesn't know this app's key yet (it reads it over adb within seconds): nothing ran, try Wi-Fi
             try { r.body.close() } catch (_: Exception) {}
             null
-        } else r
+        } else {
+            usbSkipUntil = 0L
+            r
+        }
     } catch (e: Exception) {
+        // Avoid retrying USB on every tap/poll when running wirelessly over Wi-Fi.
+        usbSkipUntil = System.currentTimeMillis() + 5_000L
         null
     }
 
@@ -253,6 +278,19 @@ class AgentLink(private val context: Context) {
     /** Over Wi-Fi to the active computer, or to [target] when a caller must reach one particular computer. */
     private fun wifi(method: String, pathAndQuery: String, readTimeout: Int, body: ByteArray?, contentType: String?, target: Pc? = null): Reply? {
         val pc = target ?: activePc() ?: return null
+        tryWifiHosts(pc, method, pathAndQuery, readTimeout, body, contentType, target == null)?.let { return it }
+
+        // Stored IP(s) failed (common when DHCP assigns the PC a new IP): probe the LAN via UDP and match pinned fingerprint.
+        if (target == null) {
+            val updated = discoverAndUpdatePc(pc)
+            if (updated != null && updated.hosts != pc.hosts) {
+                tryWifiHosts(updated, method, pathAndQuery, readTimeout, body, contentType, true)?.let { return it }
+            }
+        }
+        return null
+    }
+
+    private fun tryWifiHosts(pc: Pc, method: String, pathAndQuery: String, readTimeout: Int, body: ByteArray?, contentType: String?, updatePreferred: Boolean): Reply? {
         val hosts = pc.hosts
         val token = pc.token
         val pin = pc.id
@@ -261,8 +299,7 @@ class AgentLink(private val context: Context) {
         // Reuse one socket factory per pinned certificate so HTTPS connections are kept alive between requests.
         val f = factory?.takeIf { it.first == pin }?.second ?: pinnedFactory(pin).also { factory = pin to it }
         // Start with the address that worked last time.
-        // (preferredHost indexes the active computer's addresses, so another computer neither uses nor sets it)
-        val order = hosts.indices.sortedBy { if (target == null && it == preferredHost) -1 else it }
+        val order = hosts.indices.sortedBy { if (updatePreferred && it == preferredHost) -1 else it }
         for (i in order) {
             try {
                 val c = URL("https://${hosts[i]}:$port$pathAndQuery").openConnection() as HttpsURLConnection
@@ -271,13 +308,119 @@ class AgentLink(private val context: Context) {
                 c.connectTimeout = 1500
                 c.setRequestProperty("Authorization", "Bearer $token")
                 val r = send(c, method, readTimeout, body, contentType)
-                if (target == null) preferredHost = i
+                if (updatePreferred) preferredHost = i
                 return r
             } catch (e: Exception) {
                 // try the next address
             }
         }
         return null
+    }
+
+    private fun isTailscaleIp(host: String): Boolean {
+        val p = host.split('.')
+        if (p.size != 4) return false
+        val b0 = p[0].toIntOrNull() ?: return false
+        val b1 = p[1].toIntOrNull() ?: return false
+        return b0 == 100 && b1 in 64..127
+    }
+
+    private fun mergeDiscoveredHosts(existing: List<String>, discovered: List<String>): List<String> {
+        val valid = discovered.filter { PairLink.isLocalAddress(it) }
+        if (valid.isEmpty()) return existing
+        val tailscale = existing.filter { isTailscaleIp(it) && it !in valid }
+        return (valid + tailscale).distinct().take(8)
+    }
+
+    /**
+     * Broadcasts a UDP discovery probe on LAN/Wi-Fi interfaces and matches replies against [pc]'s pinned certificate
+     * fingerprint. When the PC moved to a new DHCP IP, saves the updated addresses and returns the refreshed [Pc].
+     */
+    private fun discoverAndUpdatePc(pc: Pc): Pc? {
+        val now = System.currentTimeMillis()
+        if (now - lastDiscoveryAt < DISCOVERY_COOLDOWN_MS) return null
+        lastDiscoveryAt = now
+
+        val probe = DISCOVERY_PROBE.toByteArray(Charsets.UTF_8)
+        val links = lanLinks()
+        val targets = links.mapNotNull { link -> networkOwning(link)?.let { link to it } }
+        val discoveredHosts = linkedSetOf<String>()
+        var discoveredPort = pc.port
+
+        fun probeOnSocket(socket: java.net.DatagramSocket, broadcasts: List<java.net.InetAddress>) {
+            socket.broadcast = true
+            socket.soTimeout = 350
+            for (addr in broadcasts) {
+                try {
+                    socket.send(java.net.DatagramPacket(probe, probe.size, addr, DISCOVERY_PORT))
+                } catch (_: Exception) {}
+            }
+            val deadline = System.currentTimeMillis() + 900
+            val buf = ByteArray(2048)
+            while (System.currentTimeMillis() < deadline) {
+                try {
+                    val pkt = java.net.DatagramPacket(buf, buf.size)
+                    socket.receive(pkt)
+                    val text = String(pkt.data, pkt.offset, pkt.length, Charsets.UTF_8)
+                    val j = JSONObject(text)
+                    val fp = j.optString("fp").lowercase()
+                    if (!fp.equals(pc.id, ignoreCase = true)) continue
+                    val port = j.optInt("port", pc.port)
+                    if (port in 1..65535) discoveredPort = port
+                    val arr = j.optJSONArray("hosts")
+                    if (arr != null) {
+                        for (i in 0 until arr.length()) {
+                            val h = arr.optString(i).trim()
+                            if (PairLink.isLocalAddress(h)) discoveredHosts.add(h)
+                        }
+                    }
+                    pkt.address?.hostAddress?.let { sender ->
+                        if (PairLink.isLocalAddress(sender)) discoveredHosts.add(sender)
+                    }
+                    if (discoveredHosts.isNotEmpty()) break
+                } catch (_: java.net.SocketTimeoutException) {
+                    break
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        if (targets.isNotEmpty()) {
+            for ((link, network) in targets) {
+                try {
+                    java.net.DatagramSocket().use { sock ->
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) network.bindSocket(sock)
+                        val addrs = buildList {
+                            link.broadcast?.let { add(it) }
+                            add(java.net.InetAddress.getByName("255.255.255.255"))
+                        }.distinct()
+                        probeOnSocket(sock, addrs)
+                    }
+                } catch (_: Exception) {}
+                if (discoveredHosts.isNotEmpty()) break
+            }
+        } else {
+            try {
+                java.net.DatagramSocket().use { sock ->
+                    probeOnSocket(sock, listOf(java.net.InetAddress.getByName("255.255.255.255")))
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (discoveredHosts.isEmpty()) return null
+        val merged = mergeDiscoveredHosts(pc.hosts, discoveredHosts.toList())
+        if (merged == pc.hosts && discoveredPort == pc.port) return pc
+
+        synchronized(pcsLock) {
+            val current = pcs.firstOrNull { it.id == pc.id } ?: return null
+            val updated = Pc(current.id, current.name, merged, discoveredPort, current.token, current.macs)
+            if (!closed) {
+                savePcs(pcs.map { if (it.id == pc.id) updated else it }, activeId)
+                preferredHost = 0
+                trackpadSocket.close()
+            }
+            return updated
+        }
     }
 
     private fun send(c: HttpURLConnection, method: String, readTimeout: Int = 4000): Reply =
@@ -341,15 +484,19 @@ class AgentLink(private val context: Context) {
         }
     }
 
-    /** Asks [pc] (not whichever computer is active now) for its MACs and replaces the stored list of that same computer. */
+    /** Asks [pc] (not whichever computer is active now) for its MACs and LAN hosts and replaces the stored list of that same computer. */
     private fun refreshMacs(pc: Pc) {
         val r = wifi("GET", "/api/wake/macs", 4000, null, null, pc) ?: return
         if (r.code != 200) { r.body.close(); return }
-        val macs = r.body.use { WakePacket.macsFrom(JSONObject(it.bufferedReader().readText()).optJSONArray("macs")) } ?: return
+        val j = r.body.use { JSONObject(it.bufferedReader().readText()) }
+        val macs = WakePacket.macsFrom(j.optJSONArray("macs"))
+        val reportedHosts = j.optJSONArray("hosts")?.let { a -> (0 until a.length()).map { a.optString(it) } }
         synchronized(pcsLock) {
-            val current = pcs.firstOrNull { it.id == pc.id }
-            if (!closed && current != null && current.macs != macs)
-                savePcs(pcs.map { if (it.id == pc.id) Pc(it.id, it.name, it.hosts, it.port, it.token, macs) else it }, activeId)
+            val current = pcs.firstOrNull { it.id == pc.id } ?: return
+            val nextMacs = macs ?: current.macs
+            val nextHosts = if (!reportedHosts.isNullOrEmpty()) mergeDiscoveredHosts(current.hosts, reportedHosts) else current.hosts
+            if (!closed && (current.macs != nextMacs || current.hosts != nextHosts))
+                savePcs(pcs.map { if (it.id == pc.id) Pc(it.id, it.name, nextHosts, it.port, it.token, nextMacs) else it }, activeId)
         }
     }
 
@@ -637,6 +784,9 @@ class AgentLink(private val context: Context) {
         private const val USB_BASE = "https://127.0.0.1:8765"
         /** The agent sends "state" every second, so a silent connection for this long is dead. */
         private const val STREAM_READ_TIMEOUT = 8000
+        private const val DISCOVERY_PORT = 8767
+        private const val DISCOVERY_PROBE = "PHONEBOX_DISCOVER_V1"
+        private const val DISCOVERY_COOLDOWN_MS = 4_000L
     }
 }
 

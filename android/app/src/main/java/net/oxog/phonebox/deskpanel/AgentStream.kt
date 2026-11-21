@@ -44,6 +44,19 @@ class AgentStream(private val link: AgentLink, private val deliver: (event: Stri
         worker?.interrupt()
     }
 
+    /** Wakes up a sleeping loop or breaks the active stream so a freshly attached USB cable or Wi-Fi network is used immediately. */
+    fun reconnectNow() {
+        val active: Closeable?
+        val worker: Thread?
+        synchronized(gate) {
+            if (!running) return
+            active = current
+            worker = thread
+        }
+        try { active?.close() } catch (_: Exception) {}
+        worker?.interrupt()
+    }
+
     /**
      * Delivers only while generation [gen] is current. The check and the delivery happen under [gate], so stop() waits
      * for a delivery in flight and nothing is delivered after it returns. [deliver] must not block (it only posts).
@@ -73,7 +86,6 @@ class AgentStream(private val link: AgentLink, private val deliver: (event: Stri
                 reply.body.bufferedReader(Charsets.UTF_8).use { r ->
                     if (!alive()) return@use
                     dispatch(gen, "open", "{\"route\":\"${route.name.lowercase()}\"}")
-                    val since = System.currentTimeMillis()
                     var event = "message"
                     val data = StringBuilder()
                     while (alive()) {
@@ -84,7 +96,6 @@ class AgentStream(private val link: AgentLink, private val deliver: (event: Stri
                                 if (data.isNotEmpty()) dispatch(gen, event, data.toString())
                                 event = "message"
                                 data.setLength(0)
-                                if (route == AgentLink.Route.WIFI && System.currentTimeMillis() - since > 60_000) break
                             }
                             line.startsWith("event:") -> event = line.substring(6).trim()
                             line.startsWith("data:") -> data.append(line.substring(5).trimStart())
