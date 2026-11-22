@@ -95,6 +95,7 @@ builder.Services.AddSingleton<HomeAssistant>();
 builder.Services.AddSingleton<AppConsole>();
 builder.Services.AddSingleton<Dictation>();
 builder.Services.AddSingleton<SpectrumAnalyzer>();
+builder.Services.AddSingleton(sp => new AsusControl(configDir, sp.GetRequiredService<ILogger<AsusControl>>()));
 AddMonitor<SystemMonitor>(builder.Services);
 AddMonitor<MediaMonitor>(builder.Services);
 AddMonitor<QuotaMonitor>(builder.Services);
@@ -521,6 +522,22 @@ app.MapGet("/api/catalog", () => Results.Text($"{{\"cols\":{Catalog.Cols},\"rows
 // POST /api/refresh          refreshes quotas/GitHub now and makes the phone reload its settings and data; ?reload=1 reloads the whole panel
 app.MapGet("/api/push", (PushStore push) => Results.Json(new { version = push.Version, items = push.Snapshot() }));
 app.MapGet("/api/notifications", (WindowsNotificationMonitor winNotifs) => Results.Json(new { items = winNotifs.Recent() }));
+app.MapGet("/api/asus", (AsusControl asus) => Results.Json(asus.Snapshot()));
+app.MapPost("/api/asus/refresh", (string? hz, AsusControl asus) =>
+{
+    var (ok, error, state) = asus.SetRefreshRate(hz);
+    return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
+});
+app.MapPost("/api/asus/fan", (string? mode, AsusControl asus) =>
+{
+    var (ok, error, state) = asus.SetFanProfile(mode);
+    return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
+});
+app.MapPost("/api/asus/battery", (int? limit, AsusControl asus) =>
+{
+    var (ok, error, state) = asus.SetBatteryLimit(limit ?? 80);
+    return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
+});
 app.MapGet("/api/push/{key}", (string key, PushStore push) => push.Get(key) is { } item ? Results.Json(item) : Results.NotFound());
 app.MapMethods("/api/push/{key}", ["POST", "PUT"], async (string key, int? ttl, HttpRequest req, PushStore push) =>
 {

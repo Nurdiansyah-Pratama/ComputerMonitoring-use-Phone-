@@ -16,6 +16,7 @@ import './widgets/console.js';
 import './widgets/dictate.js';
 import './widgets/camera.js';
 import './widgets/spectrum.js';
+import './widgets/asus.js';
 import { extractPalette, initLiveBackground } from './live-bg.js';
 export { extractPalette };
 

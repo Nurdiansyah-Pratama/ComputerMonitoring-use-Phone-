@@ -750,6 +750,47 @@ html.beat-3 .sess.busy .st, html.beat-4 .sess.shell .st, html.beat-2 .sess.waiti
   color: #fff;
 }
 
+/* ---------- Laptop Control (MyASUS) ---------- */
+.w-asus { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.as-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
+.as-group { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+.as-group.dimmed { opacity: .45; pointer-events: none; }
+.as-head { display: flex; align-items: center; gap: 6px; font-size: clamp(10.5px, 3.6cqh, 13px); color: var(--muted); }
+.as-ico { display: inline-flex; align-items: center; color: rgb(var(--ambient)); }
+.as-ico svg { width: 14px; height: 14px; }
+.as-lbl { font-weight: 600; color: var(--text); letter-spacing: .01em; }
+.as-val { margin-left: auto; font-size: 0.92em; font-weight: 700; color: rgb(var(--ambient)); }
+.as-seg { display: flex; gap: 7px; flex: 1; min-height: 0; max-height: 56px; }
+.as-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 5px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  color: var(--muted);
+  transition: transform .12s ease, background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.as-btn b { font-size: clamp(12px, 4.4cqh, 15px); font-weight: 700; white-space: nowrap; }
+.as-btn small { font-size: clamp(9.5px, 3.1cqh, 11px); opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.as-btn:active { transform: scale(.96); }
+.as-btn.on {
+  background: rgba(var(--ambient), 0.22);
+  border-color: rgba(var(--ambient), 0.72);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(var(--ambient), 0.22);
+}
+.as-btn.on.c-lo { background: rgba(56, 189, 248, 0.20); border-color: rgba(56, 189, 248, 0.75); box-shadow: 0 0 14px rgba(56, 189, 248, 0.22); }
+.as-btn.on.c-mid { background: rgba(34, 197, 94, 0.20); border-color: rgba(34, 197, 94, 0.75); box-shadow: 0 0 14px rgba(34, 197, 94, 0.22); }
+.as-btn.on.c-hi { background: rgba(45, 212, 191, 0.22); border-color: rgba(45, 212, 191, 0.8); box-shadow: 0 0 16px rgba(45, 212, 191, 0.26); }
+.as-btn.on.c-hot { background: rgba(249, 115, 22, 0.24); border-color: rgba(249, 115, 22, 0.82); box-shadow: 0 0 16px rgba(249, 115, 22, 0.28); }
+.as-btn:disabled { opacity: .55; }
+
 /* ---------- world clocks ---------- */
 .w-worldclock { padding: 6px 4px; }
 .wc-row { height: 100%; display: flex; }
