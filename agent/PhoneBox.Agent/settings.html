@@ -460,6 +460,32 @@ nav a.on::before { color: var(--accent); }
   .grid2 { grid-template-columns: 1fr; }
   .deck { --cols: 3 !important; }
 }
+.theme-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; margin: 10px 0 14px; }
+.tg-card {
+  display: flex; flex-direction: column; gap: 7px; padding: 9px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+  text-align: left; cursor: pointer; font: inherit; transition: border-color .15s, transform .12s, box-shadow .15s;
+}
+.tg-card:hover { border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); transform: translateY(-1px); }
+.tg-card.on { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent); }
+.tg-prev {
+  height: 54px; border-radius: 8px; padding: 7px 8px; display: flex; flex-direction: column; justify-content: space-between;
+  position: relative; overflow: hidden; border: 1px solid rgba(255,255,255,.12);
+}
+.tg-prev .tg-time { font-size: 16px; font-weight: 700; line-height: 1; letter-spacing: -.03em; }
+.tg-prev .tg-bars { display: flex; gap: 4px; }
+.tg-prev .tg-bars i { height: 5px; border-radius: 3px; flex: 1; display: block; }
+.tg-name { font-size: 12.5px; font-weight: 650; line-height: 1.2; }
+.tg-sub { font-size: 11px; color: var(--muted); line-height: 1.25; }
+.tg-prev.p-default { background: radial-gradient(circle at 80% 20%, rgba(45,212,191,.38), transparent 60%), #070a10; color: #eef2f6; }
+.tg-prev.p-nothing { background: radial-gradient(rgba(255,255,255,.18) 1px, transparent 1px) 0 0/7px 7px, #070707; color: #fff; font-family: ui-monospace, monospace; border: 1px dotted rgba(255,255,255,.32); }
+.tg-prev.p-cyberpunk { background: linear-gradient(135deg, #070517, #16092d); color: #fcee0a; font-family: ui-monospace, monospace; border: 1px solid #00f0ff; border-top: 2px solid #fcee0a; border-radius: 2px; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
+.tg-prev.p-macglass { background: linear-gradient(135deg, #2563eb, #8b5cf6 52%, #ec4899); color: #fff; border: 1px solid rgba(255,255,255,.45); box-shadow: inset 0 1px 0 rgba(255,255,255,.55); }
+.tg-prev.p-industrial { background: linear-gradient(180deg, #2c3139, #1c1f25); color: #eceef2; font-family: ui-monospace, monospace; border: 1px solid #49515e; border-radius: 4px; box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+.tg-prev.p-amoled { background: #000; color: #eef2f6; border-color: rgba(255,255,255,.14); }
+.tg-prev.p-midnight { background: linear-gradient(135deg, #070c1e, #101b3d); color: #eef2f6; border-color: rgba(140,170,255,.28); }
+.tg-prev.p-warm { background: linear-gradient(135deg, #120b08, #24150e); color: #f6ede5; border-color: rgba(255,196,150,.24); }
+.tg-prev.p-graphite { background: linear-gradient(135deg, #16181c, #242830); color: #eef2f6; border-color: rgba(255,255,255,.18); }
 </style>
 </head>
 <body>
@@ -694,10 +720,21 @@ nav a.on::before { color: var(--accent); }
           <div class="field" style="margin:0"><label data-i18n="lang.label">Language</label>
             <select data-bind="display.language" id="displayLangSel"></select></div>
           <div class="field" style="margin:0"><label data-i18n="s.display.theme">Theme</label>
-            <select data-bind="display.theme"><option value="default" data-i18n="s.display.theme.default">Default</option><option value="amoled" data-i18n="s.display.theme.amoled">AMOLED black</option><option value="midnight" data-i18n="s.display.theme.midnight">Midnight blue</option><option value="warm" data-i18n="s.display.theme.warm">Warm</option><option value="graphite" data-i18n="s.display.theme.graphite">Graphite</option></select></div>
+            <select data-bind="display.theme" id="displayThemeSel">
+              <option value="default" data-i18n="s.display.theme.default">Default</option>
+              <option value="nothing" data-i18n="s.display.theme.nothing">Nothing OS (Dot-Matrix)</option>
+              <option value="cyberpunk" data-i18n="s.display.theme.cyberpunk">Cyberpunk (Neon HUD)</option>
+              <option value="macglass" data-i18n="s.display.theme.macglass">MacBook Glass (Liquid)</option>
+              <option value="industrial" data-i18n="s.display.theme.industrial">Industrial (Hardware)</option>
+              <option value="amoled" data-i18n="s.display.theme.amoled">AMOLED black</option>
+              <option value="midnight" data-i18n="s.display.theme.midnight">Midnight blue</option>
+              <option value="warm" data-i18n="s.display.theme.warm">Warm</option>
+              <option value="graphite" data-i18n="s.display.theme.graphite">Graphite</option>
+            </select></div>
           <div class="field" style="margin:0"><label data-i18n="s.display.accent">Accent colour</label><input type="color" data-bind="display.accent" style="width:56px;height:36px;padding:2px"></div>
           <label class="check" style="margin-bottom:8px"><input type="checkbox" data-bind="display.artTint"> <span data-i18n="s.display.artTint">Tint the background with the album art</span></label>
         </div>
+        <div class="theme-gallery" id="themeGallery"></div>
         <div class="field" style="max-width:420px"><label data-i18n="s.display.orientation">Orientation</label>
           <select data-bind="display.orientation"><option value="landscape" data-i18n="s.display.orientation.landscape">Landscape</option><option value="portrait" data-i18n="s.display.orientation.portrait">Portrait</option><option value="auto" data-i18n="s.display.orientation.auto">Follow the phone</option></select>
           <span class="hint" data-i18n="s.display.orientationHint">You design pages in landscape; in portrait the panel arranges the widgets by itself, top to bottom. Tablets use the same pages, just bigger.</span></div>
@@ -3206,9 +3243,44 @@ function bindLanguage() {
   if ($('displayLangSel')) $('displayLangSel').onchange = (e) => onPick(e.target.value);
 }
 
+function renderThemeGallery() {
+  const host = $('themeGallery');
+  if (!host) return;
+  const cur = cfg.display?.theme || 'default';
+  const list = [
+    { id: 'default', name: 'Default', sub: 'Aurora living glass', bars: ['#2dd4bf', '#6366f1'] },
+    { id: 'nothing', name: 'Nothing OS', sub: 'Dot-matrix OLED · Red', bars: ['#ffffff', '#d71921'] },
+    { id: 'cyberpunk', name: 'Cyberpunk', sub: 'Night City Neon HUD', bars: ['#00f0ff', '#ff2a6d'] },
+    { id: 'macglass', name: 'MacBook Glass', sub: 'macOS Liquid Vibrancy', bars: ['rgba(255,255,255,.85)', '#38bdf8'] },
+    { id: 'industrial', name: 'Industrial', sub: 'CNC Gunmetal · Orange', bars: ['#ff5a1f', '#9ca3af'] },
+    { id: 'amoled', name: 'AMOLED Black', sub: 'Pure OLED black', bars: ['#2dd4bf', '#475569'] },
+    { id: 'midnight', name: 'Midnight', sub: 'Deep indigo glass', bars: ['#60a5fa', '#818cf8'] },
+    { id: 'warm', name: 'Warm', sub: 'Espresso amber', bars: ['#f59e0b', '#fb923c'] },
+    { id: 'graphite', name: 'Graphite', sub: 'Neutral slate', bars: ['#cbd5e1', '#64748b'] },
+  ];
+  host.replaceChildren(...list.map((item) => {
+    const prev = h('div', { class: 'tg-prev p-' + item.id },
+      h('div', { class: 'tg-time' }, '12:45'),
+      h('div', { class: 'tg-bars' },
+        h('i', { style: { background: item.bars[0] } }),
+        h('i', { style: { background: item.bars[1] } })));
+    const btn = h('button', { type: 'button', class: 'tg-card' + (cur === item.id ? ' on' : ''), onclick: () => {
+      cfg.display ??= {};
+      cfg.display.theme = item.id;
+      const sel = $('displayThemeSel');
+      if (sel) sel.value = item.id;
+      renderThemeGallery();
+      if (typeof queuePreview === 'function') queuePreview();
+      changed();
+    } }, prev, h('div', { class: 'tg-name' }, item.name), h('div', { class: 'tg-sub' }, item.sub));
+    return btn;
+  }));
+}
+
 function bindForm() {
   renderAppearanceSettings();
   renderControlSettings();
+  renderThemeGallery();
   bindLanguage();
   document.querySelectorAll('[data-bind]').forEach((el) => {
     const p = el.dataset.bind, type = el.dataset.type;
@@ -3225,6 +3297,7 @@ function bindForm() {
       if (p === 'adbPath' && val === '') val = null;
       setPath(cfg, p, val);
       $('nbv').textContent = Math.round(cfg.night.brightness * 100) + '%';
+      if (p === 'display.theme') { renderThemeGallery(); if (typeof queuePreview === 'function') queuePreview(); }
       if (p === 'charge.method') renderCharge();
       if (p === 'lan.enabled') renderLanStatus();
       if (p === 'photos.source' || p === 'photos.immichUrl' || p === 'photos.immichKey') renderPhotoSource();

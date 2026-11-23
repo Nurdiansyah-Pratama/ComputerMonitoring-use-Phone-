@@ -23,7 +23,22 @@ public sealed class MainWindow : Form
     private readonly Panel _topBar;
     private readonly Label _statusDot;
     private readonly Label _statusLabel;
+    private readonly ComboBox _themeBox;
+    private bool _syncingTheme;
     private readonly WebView2 _web;
+
+    private static readonly (string Id, string Label)[] ThemeChoices =
+    [
+        ("default", "Style: Default"),
+        ("nothing", "Style: Nothing OS"),
+        ("cyberpunk", "Style: Cyberpunk"),
+        ("macglass", "Style: MacBook Glass"),
+        ("industrial", "Style: Industrial"),
+        ("amoled", "Style: AMOLED"),
+        ("midnight", "Style: Midnight"),
+        ("warm", "Style: Warm"),
+        ("graphite", "Style: Graphite"),
+    ];
     private readonly Label _loadingLabel;
     private readonly System.Windows.Forms.Timer _pollTimer;
     private bool _webReady;
@@ -105,6 +120,22 @@ public sealed class MainWindow : Form
             Padding = new Padding(0, 2, 0, 0),
         };
 
+        _themeBox = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            FlatStyle = FlatStyle.Flat,
+            Width = 158,
+            Height = 32,
+            BackColor = Color.FromArgb(26, 35, 52),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI Semibold", 9f),
+            Margin = new Padding(0, 3, 4, 0),
+            Cursor = Cursors.Hand,
+        };
+        foreach (var (_, label) in ThemeChoices) _themeBox.Items.Add(label);
+        _themeBox.SelectedIndex = 0;
+        _themeBox.SelectedIndexChanged += async (_, _) => await ApplySelectedThemeAsync();
+
         var btnEditor = MakeNavButton("Editor Tampilan", Color.FromArgb(32, 44, 64), (_, _) => NavigateTo("/"));
         var btnPreview = MakeNavButton("Live Preview", Color.FromArgb(32, 44, 64), (_, _) => NavigateTo("/panel/"));
         var btnWifi = MakeNavButton("Hubungkan Wi-Fi (QR)", Color.FromArgb(16, 124, 110), (_, _) => ShowWifiPairingDialog());
@@ -114,6 +145,7 @@ public sealed class MainWindow : Form
             if (_webReady && _web is not null) _web.CoreWebView2?.Reload();
         });
 
+        rightFlow.Controls.Add(_themeBox);
         rightFlow.Controls.Add(btnEditor);
         rightFlow.Controls.Add(btnPreview);
         rightFlow.Controls.Add(btnWifi);
@@ -247,6 +279,49 @@ public sealed class MainWindow : Form
         }
     }
 
+    private async Task ApplySelectedThemeAsync()
+    {
+        if (_syncingTheme || _themeBox.SelectedIndex < 0 || _themeBox.SelectedIndex >= ThemeChoices.Length) return;
+        var (id, _) = ThemeChoices[_themeBox.SelectedIndex];
+        try
+        {
+            using var resp = await _http.PostAsync($"{_settingsUrl}/api/theme?theme={Uri.EscapeDataString(id)}", null);
+            if (resp.IsSuccessStatusCode && _webReady && _web.CoreWebView2 is not null)
+            {
+                if (_currentPath.StartsWith("/panel", StringComparison.OrdinalIgnoreCase))
+                    await _web.CoreWebView2.ExecuteScriptAsync($"document.body.dataset.theme = {JsonSerializer.Serialize(id)};");
+                else
+                    _web.CoreWebView2.Reload();
+            }
+        }
+        catch { }
+    }
+
+    private async Task SyncThemeDropdownAsync()
+    {
+        if (_themeBox.DroppedDown || _themeBox.Focused) return;
+        try
+        {
+            var cfgJson = await _http.GetStringAsync(_settingsUrl + "/api/config");
+            using var doc = JsonDocument.Parse(cfgJson);
+            if (doc.RootElement.TryGetProperty("config", out var c)
+                && c.TryGetProperty("display", out var d)
+                && d.TryGetProperty("theme", out var th)
+                && th.ValueKind == JsonValueKind.String)
+            {
+                var id = th.GetString() ?? "default";
+                var idx = Array.FindIndex(ThemeChoices, x => string.Equals(x.Id, id, StringComparison.OrdinalIgnoreCase));
+                if (idx >= 0 && _themeBox.SelectedIndex != idx)
+                {
+                    _syncingTheme = true;
+                    try { _themeBox.SelectedIndex = idx; }
+                    finally { _syncingTheme = false; }
+                }
+            }
+        }
+        catch { }
+    }
+
     private void NavigateTo(string path)
     {
         _currentPath = path;
@@ -310,6 +385,7 @@ public sealed class MainWindow : Form
                 _statusLabel.Text = $"Menunggu HP · Wi-Fi siap di {ipText}:8766 (UDP 8767)";
                 _statusLabel.ForeColor = Color.FromArgb(253, 230, 138);
             }
+            await SyncThemeDropdownAsync();
         }
         catch
         {

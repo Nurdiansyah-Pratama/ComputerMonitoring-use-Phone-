@@ -2038,6 +2038,54 @@ export function onScroll() {
 }
 pager.addEventListener('scroll', onScroll, { passive: true });
 
+const PANEL_THEMES = [
+  { id: 'default', label: 'Default', swatch: 'linear-gradient(135deg,#2dd4bf,#6366f1)' },
+  { id: 'nothing', label: 'Nothing OS', swatch: 'linear-gradient(135deg,#111 50%,#d71921 50%)' },
+  { id: 'cyberpunk', label: 'Cyberpunk', swatch: 'linear-gradient(135deg,#00f0ff 45%,#fcee0a 55%)' },
+  { id: 'macglass', label: 'MacBook Glass', swatch: 'linear-gradient(135deg,#38bdf8,#a855f7,#f472b6)' },
+  { id: 'industrial', label: 'Industrial', swatch: 'linear-gradient(135deg,#2b3038 50%,#ff5a1f 50%)' },
+  { id: 'amoled', label: 'AMOLED', swatch: '#000000' },
+  { id: 'midnight', label: 'Midnight', swatch: 'linear-gradient(135deg,#0c1738,#60a5fa)' },
+  { id: 'warm', label: 'Warm', swatch: 'linear-gradient(135deg,#2a1911,#f59e0b)' },
+  { id: 'graphite', label: 'Graphite', swatch: 'linear-gradient(135deg,#272b33,#9ca3af)' },
+];
+const VALID_THEMES = PANEL_THEMES.map((x) => x.id);
+
+async function selectThemeFromPanel(id) {
+  if (!VALID_THEMES.includes(id)) return;
+  haptic();
+  cfg.display = { ...(cfg.display || {}), theme: id };
+  store.set('cfg', cfg);
+  applyDisplay();
+  renderOverviewThemes();
+  const item = PANEL_THEMES.find((x) => x.id === id);
+  toast(`Style: ${item ? item.label : id}`);
+  if (PREVIEW) return;
+  try {
+    const r = await api('/theme?theme=' + encodeURIComponent(id), 'POST', 4000);
+    if (r?.version) localWriteStored(r.version);
+  } catch (_) {}
+}
+
+function renderOverviewThemes() {
+  const host = $('ovThemes');
+  if (!host) return;
+  const cur = document.body.dataset.theme || 'default';
+  host.replaceChildren(
+    h('span', 'ov-th-lbl', 'STYLE'),
+    ...PANEL_THEMES.map((th) => {
+      const sw = h('span', 'sw');
+      sw.style.background = th.swatch;
+      const btn = h('button', 'ov-th' + (cur === th.id ? ' on' : ''), sw, th.label);
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectThemeFromPanel(th.id);
+      });
+      return btn;
+    }),
+  );
+}
+
 export function openOverview() {
   haptic();
   const ov = $('overview');
@@ -2051,6 +2099,7 @@ export function openOverview() {
     t.addEventListener('click', (e) => { e.stopPropagation(); haptic(); closeOverview(); goPage(i, true); });
     return t;
   };
+  renderOverviewThemes();
   $('ovGrid').replaceChildren(...pages.map(tile));
   renderRulesBtn();
   // several paired computers: switch between them here (a USB cable always wins)
@@ -2358,7 +2407,7 @@ export function applyDisplay() {
   LOCALE = I18n ? I18n.getLocale() : 'en-GB';
   I18n?.applyDom();
   // theme and accent apply in the preview and the browser too
-  document.body.dataset.theme = ['amoled', 'midnight', 'warm', 'graphite'].includes(d.theme) ? d.theme : 'default';
+  document.body.dataset.theme = VALID_THEMES.includes(d.theme) ? d.theme : 'default';
   const accent = hexToRgb(d.accent);
   const before = DEFAULT_AMBIENT;
   DEFAULT_AMBIENT = accent || '45, 212, 191';

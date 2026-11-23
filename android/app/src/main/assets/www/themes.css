@@ -1,0 +1,712 @@
+/* ==========================================================================
+   PhoneBox Signature Visual Styles
+   - nothing    : Nothing OS (Dot-matrix OLED, stark monochrome, Nothing Red)
+   - cyberpunk  : Night City HUD (Chamfered corners, neon cyan/yellow/magenta)
+   - macglass   : macOS Liquid Glass (Deep frosted vibrancy & specular rims)
+   - industrial : Teenage Engineering / Braun CNC hardware & safety orange
+   ========================================================================== */
+
+/* ---------- Quick Style Strip inside #overview (Phone 1-tap switcher) ---------- */
+#ovThemes {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0 4px;
+  flex: 0 0 auto;
+}
+#ovThemes::-webkit-scrollbar { display: none; }
+.ov-th-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  padding-right: 4px;
+}
+.ov-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  transition: transform .12s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.ov-th:active { transform: scale(.94); }
+.ov-th .sw {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  flex: 0 0 auto;
+}
+.ov-th.on {
+  border-color: var(--accent, #2dd4bf);
+  background: color-mix(in srgb, var(--accent, #2dd4bf) 22%, rgba(16, 20, 28, 0.92));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #2dd4bf) 45%, transparent);
+}
+
+
+/* ==========================================================================
+   1. NOTHING OS (data-theme="nothing")
+   Dot-matrix OLED minimalism · Stark Monochrome · Signature Nothing Red
+   ========================================================================== */
+body[data-theme="nothing"] {
+  --bg: #050505;
+  --card: rgba(18, 18, 18, 0.86);
+  --card-hi: rgba(34, 34, 34, 0.94);
+  --line: rgba(255, 255, 255, 0.18);
+  --text: #f5f5f5;
+  --muted: #9a9a9a;
+  --dim: #616161;
+  --cpu: #ffffff;
+  --gpu: #d71921;
+  --ram: #d4d4d4;
+  --net: #d71921;
+  --up: #e5e5e5;
+  --ok: #ffffff;
+  --err: #d71921;
+  --ambient: 215, 25, 33;
+  font-family: "Roboto Mono", "Cascadia Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+body[data-theme="nothing"]::before {
+  opacity: 1 !important;
+  background:
+    radial-gradient(rgba(255, 255, 255, 0.11) 1px, transparent 1px) 0 0 / 12px 12px !important;
+  z-index: 0;
+}
+body[data-theme="nothing"] .card {
+  background: rgba(16, 16, 16, 0.84);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: clamp(16px, 8cqmin, 24px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+body[data-theme="nothing"] .w-title,
+body[data-theme="nothing"] .s-label,
+body[data-theme="nothing"] .t-label,
+body[data-theme="nothing"] .g-label,
+body[data-theme="nothing"] .as-lbl {
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+body[data-theme="nothing"] .clock {
+  font-weight: 300;
+  letter-spacing: -0.05em;
+  color: #ffffff;
+  text-shadow: 0 0 1px rgba(255, 255, 255, 0.35);
+}
+body[data-theme="nothing"] .clock .colon {
+  color: #d71921;
+  opacity: 1;
+  text-shadow: 0 0 12px rgba(215, 25, 33, 0.7);
+}
+body[data-theme="nothing"] .clock .colon.dim { opacity: .22; text-shadow: none; }
+body[data-theme="nothing"] .dot.on {
+  background: #d71921;
+  box-shadow: 0 0 10px rgba(215, 25, 33, 0.9);
+}
+body[data-theme="nothing"] .date {
+  color: #b5b5b5;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: clamp(10px, 6.2cqh, 15px);
+}
+body[data-theme="nothing"] .wx-temp {
+  font-weight: 500;
+  color: #ffffff;
+}
+body[data-theme="nothing"] .wx-notif {
+  background: rgba(18, 18, 18, 0.92);
+  border: 1px dotted rgba(255, 255, 255, 0.32);
+  border-radius: 16px;
+}
+body[data-theme="nothing"] .wx-n-bar { background: #d71921; }
+body[data-theme="nothing"] .wx-n-ico { background: rgba(215, 25, 33, 0.18); color: #ff454d; }
+body[data-theme="nothing"] .art-wrap {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: none;
+}
+body[data-theme="nothing"] .m-app { color: #d71921; letter-spacing: .16em; }
+body[data-theme="nothing"] .ic.play {
+  background: #d71921;
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(215, 25, 33, 0.45);
+}
+body[data-theme="nothing"] .fill,
+body[data-theme="nothing"] .fill::after { background: #d71921; }
+body[data-theme="nothing"] input[type=range]::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #d71921 var(--p, 50%), rgba(255, 255, 255, .18) var(--p, 50%));
+}
+body[data-theme="nothing"] input[type=range]::-webkit-slider-thumb { background: #ffffff; }
+body[data-theme="nothing"] .key {
+  background: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px) 0 0 / 8px 8px, #121212 !important;
+  border: 1px dotted rgba(255, 255, 255, 0.26) !important;
+  border-radius: 20px;
+}
+body[data-theme="nothing"] .key .k-label {
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: clamp(9.5px, 3.2cqmin, 12.5px);
+}
+body[data-theme="nothing"] .key.toggle.on::before {
+  background: #d71921;
+  box-shadow: 0 0 10px #d71921;
+}
+body[data-theme="nothing"] .k-close {
+  border: 1px dotted rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.72);
+}
+body[data-theme="nothing"] .as-ico,
+body[data-theme="nothing"] .as-val { color: #d71921; }
+body[data-theme="nothing"] .as-btn {
+  border-radius: 999px;
+  background: #141414;
+  border: 1px dotted rgba(255, 255, 255, 0.24);
+  color: #a3a3a3;
+}
+body[data-theme="nothing"] .as-btn.on,
+body[data-theme="nothing"] .as-btn.on.c-lo,
+body[data-theme="nothing"] .as-btn.on.c-mid,
+body[data-theme="nothing"] .as-btn.on.c-hi {
+  background: #f4f4f4;
+  border: 1px solid #ffffff;
+  color: #080808;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.16);
+}
+body[data-theme="nothing"] .as-btn.on.c-hot {
+  background: #d71921;
+  border: 1px solid #ff3b43;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(215, 25, 33, 0.45);
+}
+body[data-theme="nothing"] .as-btn.on small { opacity: .82; }
+body[data-theme="nothing"] #dots i { border-radius: 99px; background: rgba(255, 255, 255, 0.24); }
+body[data-theme="nothing"] #dots i.on { background: #d71921; box-shadow: 0 0 8px rgba(215, 25, 33, 0.8); }
+body[data-theme="nothing"] .chip {
+  background: transparent;
+  border: 1px dotted rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+}
+body[data-theme="nothing"] .track { background: rgba(255, 255, 255, 0.14); border-radius: 99px; }
+body[data-theme="nothing"] #overview { background: #050505; }
+body[data-theme="nothing"] .ov-tile { background: #121212; border: 1px dotted rgba(255, 255, 255, 0.24); border-radius: 18px; }
+body[data-theme="nothing"] .ov-tile.on { border-style: solid; border-color: #d71921; box-shadow: 0 0 0 2px rgba(215, 25, 33, 0.35); }
+
+
+/* ==========================================================================
+   2. CYBERPUNK 2077 (data-theme="cyberpunk")
+   Night City Neon HUD · Chamfered Corners · Yellow / Cyan / Magenta
+   ========================================================================== */
+body[data-theme="cyberpunk"] {
+  --bg: #05040f;
+  --card: rgba(11, 10, 28, 0.80);
+  --card-hi: rgba(22, 18, 52, 0.90);
+  --line: rgba(0, 240, 255, 0.34);
+  --text: #eefaff;
+  --muted: #7dd3e8;
+  --dim: #46788e;
+  --cpu: #00f0ff;
+  --gpu: #fcee0a;
+  --ram: #ff2a6d;
+  --net: #fcee0a;
+  --up: #00f0ff;
+  --ok: #05ffa1;
+  --err: #ff2a6d;
+  --ambient: 0, 240, 255;
+  font-family: "Bahnschrift", "Roboto Condensed", "Segoe UI", system-ui, sans-serif;
+}
+/* Subtle CRT scanline sheen across viewport */
+body[data-theme="cyberpunk"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 240, 255, 0.025) 0px,
+    rgba(0, 240, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+body[data-theme="cyberpunk"] .card {
+  background: linear-gradient(155deg, rgba(16, 13, 40, 0.82), rgba(7, 8, 22, 0.88));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 240, 255, 0.38);
+  border-top: 2px solid rgba(252, 238, 10, 0.82);
+  border-radius: 3px;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  box-shadow:
+    inset 0 0 18px rgba(0, 240, 255, 0.08),
+    0 0 20px rgba(0, 240, 255, 0.10);
+}
+body[data-theme="cyberpunk"] .w-title,
+body[data-theme="cyberpunk"] .s-label,
+body[data-theme="cyberpunk"] .t-label,
+body[data-theme="cyberpunk"] .g-label {
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px currentColor;
+}
+body[data-theme="cyberpunk"] .clock {
+  font-family: "Roboto Mono", "Cascadia Mono", ui-monospace, monospace;
+  font-weight: 700;
+  color: #fcee0a;
+  letter-spacing: -0.03em;
+  text-shadow: 0 0 16px rgba(252, 238, 10, 0.45), 2px 0 0 rgba(255, 42, 109, 0.55);
+}
+body[data-theme="cyberpunk"] .clock .colon {
+  color: #ff2a6d;
+  opacity: 1;
+  text-shadow: 0 0 12px rgba(255, 42, 109, 0.85);
+}
+body[data-theme="cyberpunk"] .clock .colon.dim { opacity: .25; }
+body[data-theme="cyberpunk"] .clock .sec { color: #00f0ff; }
+body[data-theme="cyberpunk"] .dot.on {
+  background: #05ffa1;
+  box-shadow: 0 0 10px #05ffa1;
+}
+body[data-theme="cyberpunk"] .date {
+  color: #00f0ff;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+body[data-theme="cyberpunk"] .wx-temp {
+  color: #fcee0a;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(252, 238, 10, 0.4);
+}
+body[data-theme="cyberpunk"] .wx-notif {
+  background: rgba(12, 10, 32, 0.90);
+  border: 1px solid rgba(255, 42, 109, 0.65);
+  border-radius: 3px;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  box-shadow: 0 0 16px rgba(255, 42, 109, 0.25);
+}
+body[data-theme="cyberpunk"] .wx-n-bar { background: #fcee0a; box-shadow: 0 0 8px #fcee0a; }
+body[data-theme="cyberpunk"] .wx-n-ico { background: rgba(0, 240, 255, 0.16); color: #00f0ff; border-radius: 2px; }
+body[data-theme="cyberpunk"] .art-wrap {
+  border-radius: 4px;
+  border: 1px solid rgba(0, 240, 255, 0.55);
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.28);
+}
+body[data-theme="cyberpunk"] .m-app { color: #fcee0a; text-shadow: 0 0 8px rgba(252, 238, 10, 0.45); }
+body[data-theme="cyberpunk"] .ic.play {
+  background: #fcee0a;
+  color: #070514;
+  border-radius: 6px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  box-shadow: 0 0 18px rgba(252, 238, 10, 0.55);
+}
+body[data-theme="cyberpunk"] .fill,
+body[data-theme="cyberpunk"] .fill::after {
+  background: #00f0ff;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.75);
+}
+body[data-theme="cyberpunk"] input[type=range]::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #00f0ff var(--p, 50%), rgba(255, 42, 109, 0.28) var(--p, 50%));
+}
+body[data-theme="cyberpunk"] input[type=range]::-webkit-slider-thumb {
+  background: #fcee0a;
+  border-radius: 2px;
+  box-shadow: 0 0 10px rgba(252, 238, 10, 0.7);
+}
+body[data-theme="cyberpunk"] .key {
+  background: linear-gradient(155deg, rgba(16, 14, 44, 0.86), rgba(8, 7, 24, 0.92)) !important;
+  border: 1px solid rgba(0, 240, 255, 0.42) !important;
+  border-left: 3px solid #fcee0a !important;
+  border-radius: 3px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  box-shadow: inset 0 0 14px rgba(0, 240, 255, 0.08);
+}
+body[data-theme="cyberpunk"] .key .k-label {
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  font-weight: 700;
+  color: #eefaff;
+}
+body[data-theme="cyberpunk"] .key.toggle.on::before {
+  background: #fcee0a;
+  box-shadow: 0 0 10px #fcee0a;
+}
+body[data-theme="cyberpunk"] .k-close {
+  border-radius: 2px;
+  border: 1px solid rgba(255, 42, 109, 0.7);
+  background: rgba(255, 42, 109, 0.2);
+  color: #ff6b9d;
+}
+body[data-theme="cyberpunk"] .as-ico,
+body[data-theme="cyberpunk"] .as-val { color: #fcee0a; text-shadow: 0 0 8px rgba(252, 238, 10, 0.45); }
+body[data-theme="cyberpunk"] .as-lbl { text-transform: uppercase; letter-spacing: .08em; }
+body[data-theme="cyberpunk"] .as-btn {
+  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  background: rgba(14, 13, 38, 0.82);
+  border: 1px solid rgba(0, 240, 255, 0.32);
+  color: #82c8db;
+}
+body[data-theme="cyberpunk"] .as-btn.on,
+body[data-theme="cyberpunk"] .as-btn.on.c-lo,
+body[data-theme="cyberpunk"] .as-btn.on.c-mid,
+body[data-theme="cyberpunk"] .as-btn.on.c-hi {
+  background: #00f0ff;
+  border-color: #9ff9ff;
+  color: #050512;
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.55);
+}
+body[data-theme="cyberpunk"] .as-btn.on.c-hot {
+  background: #fcee0a;
+  border-color: #fff88a;
+  color: #080614;
+  box-shadow: 0 0 18px rgba(252, 238, 10, 0.6);
+}
+body[data-theme="cyberpunk"] .chip {
+  border-radius: 2px;
+  background: rgba(0, 240, 255, 0.10);
+  border: 1px solid rgba(0, 240, 255, 0.28);
+  color: #bff8ff;
+}
+body[data-theme="cyberpunk"] .track { border-radius: 1px; background: rgba(0, 240, 255, 0.16); }
+body[data-theme="cyberpunk"] #dots i { border-radius: 1px; background: rgba(0, 240, 255, 0.3); }
+body[data-theme="cyberpunk"] #dots i.on { background: #fcee0a; box-shadow: 0 0 10px #fcee0a; }
+body[data-theme="cyberpunk"] #overview { background: #05040f; }
+body[data-theme="cyberpunk"] .ov-tile {
+  background: rgba(14, 12, 36, 0.9);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: 3px;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+body[data-theme="cyberpunk"] .ov-tile.on { border-color: #fcee0a; box-shadow: 0 0 14px rgba(252, 238, 10, 0.32); }
+
+
+/* ==========================================================================
+   3. MACBOOK LIQUID GLASS (data-theme="macglass")
+   Apple macOS Sonoma / Sequoia Liquid Glass · Deep Vibrancy & Specular Rims
+   ========================================================================== */
+body[data-theme="macglass"] {
+  --bg: #0c1426;
+  --card: rgba(255, 255, 255, 0.13);
+  --card-hi: rgba(255, 255, 255, 0.22);
+  --line: rgba(255, 255, 255, 0.26);
+  --text: #ffffff;
+  --muted: rgba(235, 244, 255, 0.78);
+  --dim: rgba(220, 234, 255, 0.52);
+  --cpu: #5ac8fa;
+  --gpu: #34c759;
+  --ram: #bf5af2;
+  --net: #ff9f0a;
+  --up: #64d2ff;
+  --ok: #30d158;
+  --err: #ff453a;
+  --ambient: 90, 200, 250;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+body[data-theme="macglass"] .card {
+  background: linear-gradient(
+    148deg,
+    rgba(255, 255, 255, 0.20) 0%,
+    rgba(255, 255, 255, 0.08) 48%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  backdrop-filter: blur(28px) saturate(195%) brightness(1.06);
+  -webkit-backdrop-filter: blur(28px) saturate(195%) brightness(1.06);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: clamp(16px, 8cqmin, 24px);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.34),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.44),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.10);
+}
+body[data-theme="macglass"] .clock {
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+  text-shadow: 0 6px 26px rgba(0, 0, 0, 0.32);
+}
+body[data-theme="macglass"] .date,
+body[data-theme="macglass"] .wx-temp,
+body[data-theme="macglass"] .wx-meta {
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.30);
+}
+body[data-theme="macglass"] .wx-notif {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.10));
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+body[data-theme="macglass"] .wx-n-text { color: rgba(255, 255, 255, 0.86); }
+body[data-theme="macglass"] .art-wrap {
+  border-radius: clamp(12px, 7cqh, 20px);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
+}
+body[data-theme="macglass"] .ic.play {
+  background: rgba(255, 255, 255, 0.92);
+  color: #0d1424;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28), inset 0 1px 0 #ffffff;
+}
+body[data-theme="macglass"] .key {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.20), rgba(255, 255, 255, 0.08)) !important;
+  backdrop-filter: blur(26px) saturate(190%);
+  -webkit-backdrop-filter: blur(26px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 20px;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.26),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.44);
+}
+body[data-theme="macglass"] .key .k-label {
+  color: #ffffff;
+  font-weight: 600;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.28);
+}
+body[data-theme="macglass"] .k-close {
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+}
+body[data-theme="macglass"] .as-ico,
+body[data-theme="macglass"] .as-val { color: #7dd3fc; }
+body[data-theme="macglass"] .as-btn {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+body[data-theme="macglass"] .as-btn.on,
+body[data-theme="macglass"] .as-btn.on.c-lo,
+body[data-theme="macglass"] .as-btn.on.c-mid,
+body[data-theme="macglass"] .as-btn.on.c-hi {
+  background: linear-gradient(160deg, rgba(10, 132, 255, 0.85), rgba(56, 189, 248, 0.72));
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(10, 132, 255, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+body[data-theme="macglass"] .as-btn.on.c-hot {
+  background: linear-gradient(160deg, rgba(255, 159, 10, 0.88), rgba(255, 95, 86, 0.78));
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(255, 159, 10, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+body[data-theme="macglass"] .chip {
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  border-radius: 999px;
+}
+body[data-theme="macglass"] #dots {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  margin-bottom: 3px;
+}
+body[data-theme="macglass"] #dots i.on { background: #ffffff; }
+body[data-theme="macglass"] #overview {
+  background: rgba(12, 20, 38, 0.72);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+}
+body[data-theme="macglass"] .ov-tile {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+
+/* ==========================================================================
+   4. INDUSTRIAL (data-theme="industrial")
+   Teenage Engineering / Braun CNC Anodized Gunmetal · Tactile Hardware · Orange
+   ========================================================================== */
+body[data-theme="industrial"] {
+  --bg: #17191d;
+  --card: #22252b;
+  --card-hi: #2b3038;
+  --line: #3c424d;
+  --text: #eceef2;
+  --muted: #98a0ac;
+  --dim: #666e7a;
+  --cpu: #ff5a1f;
+  --gpu: #f59e0b;
+  --ram: #cbd5e1;
+  --net: #ff5a1f;
+  --up: #60a5fa;
+  --ok: #22c55e;
+  --err: #ef4444;
+  --ambient: 255, 90, 31;
+  font-family: "Roboto Mono", "Cascadia Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+body[data-theme="industrial"] .card {
+  /* Machined gunmetal aluminum plate with 4 subtle corner rivet dots */
+  background:
+    radial-gradient(circle 2px at 10px 10px, rgba(255, 255, 255, 0.20) 55%, rgba(0, 0, 0, 0.55) 75%, transparent 100%),
+    radial-gradient(circle 2px at calc(100% - 10px) 10px, rgba(255, 255, 255, 0.20) 55%, rgba(0, 0, 0, 0.55) 75%, transparent 100%),
+    radial-gradient(circle 2px at 10px calc(100% - 10px), rgba(255, 255, 255, 0.20) 55%, rgba(0, 0, 0, 0.55) 75%, transparent 100%),
+    radial-gradient(circle 2px at calc(100% - 10px) calc(100% - 10px), rgba(255, 255, 255, 0.20) 55%, rgba(0, 0, 0, 0.55) 75%, transparent 100%),
+    linear-gradient(180deg, rgba(40, 44, 51, 0.94) 0%, rgba(28, 31, 36, 0.96) 100%);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid #3c424d;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.13),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.52),
+    0 5px 14px rgba(0, 0, 0, 0.44);
+}
+body[data-theme="industrial"] .w-title,
+body[data-theme="industrial"] .s-label,
+body[data-theme="industrial"] .t-label,
+body[data-theme="industrial"] .g-label {
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+body[data-theme="industrial"] .clock {
+  font-weight: 600;
+  color: #f3f4f6;
+  letter-spacing: -0.04em;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.65);
+}
+body[data-theme="industrial"] .clock .colon {
+  color: #ff5a1f;
+  opacity: 1;
+  text-shadow: 0 0 10px rgba(255, 90, 31, 0.65);
+}
+body[data-theme="industrial"] .clock .colon.dim { opacity: .25; text-shadow: none; }
+body[data-theme="industrial"] .dot.on {
+  background: #ff5a1f;
+  box-shadow: 0 0 8px rgba(255, 90, 31, 0.85);
+}
+body[data-theme="industrial"] .date {
+  color: #aeb6c2;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  font-size: clamp(10px, 6.2cqh, 15px);
+}
+body[data-theme="industrial"] .wx-temp {
+  color: #ff5a1f;
+  font-weight: 700;
+}
+body[data-theme="industrial"] .wx-notif {
+  background: linear-gradient(180deg, #272b32, #1d2026);
+  border: 1px solid #444b57;
+  border-radius: 5px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+body[data-theme="industrial"] .wx-n-bar { background: #ff5a1f; }
+body[data-theme="industrial"] .wx-n-ico { background: rgba(255, 90, 31, 0.16); color: #ff7847; border-radius: 3px; }
+body[data-theme="industrial"] .art-wrap {
+  border-radius: 5px;
+  border: 2px solid #3c424d;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
+}
+body[data-theme="industrial"] .m-app { color: #ff5a1f; }
+body[data-theme="industrial"] .ic.play {
+  background: linear-gradient(180deg, #ff6c33, #e04712);
+  color: #121417;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.38),
+    0 4px 12px rgba(0, 0, 0, 0.45);
+}
+body[data-theme="industrial"] .fill,
+body[data-theme="industrial"] .fill::after { background: #ff5a1f; }
+body[data-theme="industrial"] input[type=range]::-webkit-slider-runnable-track {
+  background: linear-gradient(to right, #ff5a1f var(--p, 50%), #373d47 var(--p, 50%));
+  border-radius: 2px;
+}
+body[data-theme="industrial"] input[type=range]::-webkit-slider-thumb {
+  background: #eceef2;
+  border-radius: 3px;
+  border: 1px solid #14161a;
+}
+body[data-theme="industrial"] .key {
+  background: linear-gradient(180deg, #2d323a 0%, #21252c 100%) !important;
+  border: 1px solid #444b57 !important;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.58),
+    0 4px 10px rgba(0, 0, 0, 0.42);
+  transition: transform .08s ease, box-shadow .08s ease;
+}
+body[data-theme="industrial"] .key:active {
+  transform: translateY(2px) scale(.98);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.65);
+}
+body[data-theme="industrial"] .key .k-label {
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  font-size: clamp(9.5px, 3.2cqmin, 12.5px);
+  font-weight: 600;
+}
+body[data-theme="industrial"] .key.toggle.on::before {
+  background: #ff5a1f;
+  box-shadow: 0 0 9px #ff5a1f;
+}
+body[data-theme="industrial"] .k-close {
+  border-radius: 4px;
+  border: 1px solid #4c5360;
+  background: #1a1d22;
+}
+body[data-theme="industrial"] .as-ico,
+body[data-theme="industrial"] .as-val { color: #ff5a1f; }
+body[data-theme="industrial"] .as-lbl { text-transform: uppercase; letter-spacing: .08em; }
+body[data-theme="industrial"] .as-btn {
+  border-radius: 5px;
+  background: linear-gradient(180deg, #2d323a, #21252b);
+  border: 1px solid #454c58;
+  color: #aeb6c2;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -2px 0 rgba(0, 0, 0, 0.5);
+}
+body[data-theme="industrial"] .as-btn:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.55);
+}
+body[data-theme="industrial"] .as-btn.on,
+body[data-theme="industrial"] .as-btn.on.c-lo,
+body[data-theme="industrial"] .as-btn.on.c-mid,
+body[data-theme="industrial"] .as-btn.on.c-hi,
+body[data-theme="industrial"] .as-btn.on.c-hot {
+  background: linear-gradient(180deg, #ff6c33, #e64a15);
+  border-color: #ff9468;
+  color: #111317;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 0 14px rgba(255, 90, 31, 0.35);
+}
+body[data-theme="industrial"] .as-btn.on small { opacity: .88; color: #191c22; font-weight: 600; }
+body[data-theme="industrial"] .chip {
+  border-radius: 3px;
+  background: #1a1d22;
+  border: 1px solid #3c424d;
+  color: #d4d8df;
+}
+body[data-theme="industrial"] .track { border-radius: 2px; background: #14171b; border: 1px solid #353b45; }
+body[data-theme="industrial"] #dots i { border-radius: 2px; background: #4a515e; }
+body[data-theme="industrial"] #dots i.on { background: #ff5a1f; box-shadow: 0 0 8px rgba(255, 90, 31, 0.7); }
+body[data-theme="industrial"] #overview { background: #17191d; }
+body[data-theme="industrial"] .ov-tile {
+  background: linear-gradient(180deg, #272b32, #1e2127);
+  border: 1px solid #3f4652;
+  border-radius: 6px;
+}
+body[data-theme="industrial"] .ov-tile.on { border-color: #ff5a1f; box-shadow: 0 0 0 2px rgba(255, 90, 31, 0.32); }

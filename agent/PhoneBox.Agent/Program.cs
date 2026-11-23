@@ -538,6 +538,38 @@ app.MapPost("/api/asus/battery", (int? limit, AsusControl asus) =>
     var (ok, error, state) = asus.SetBatteryLimit(limit ?? 80);
     return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
 });
+app.MapPost("/api/theme", async (string? theme, HttpRequest req, ConfigStore cfg, PushStore push) =>
+{
+    var chosen = (theme ?? "").Trim();
+    if (string.IsNullOrEmpty(chosen) && req.ContentLength is > 0 and < 4096)
+    {
+        try
+        {
+            using var doc = await JsonDocument.ParseAsync(req.Body);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("theme", out var prop) && prop.ValueKind == JsonValueKind.String)
+                chosen = (prop.GetString() ?? "").Trim();
+        }
+        catch { }
+    }
+    var normalized = DisplayConfig.Themes.FirstOrDefault(t => t.Equals(chosen, StringComparison.OrdinalIgnoreCase));
+    if (normalized is null)
+        return Results.BadRequest(new { ok = false, error = $"Unknown theme '{chosen}'", themes = DisplayConfig.Themes });
+
+    string? err;
+    long savedVersion;
+    lock (IconCommit)
+    {
+        var current = cfg.Get();
+        var clone = JsonSerializer.Deserialize<AgentConfig>(JsonSerializer.Serialize(current, ConfigStore.WriteOpts), ConfigStore.ReadOpts) ?? new();
+        clone.Display ??= new();
+        clone.Display.Theme = normalized;
+        var json = JsonSerializer.Serialize(clone, ConfigStore.WriteOpts);
+        err = cfg.Save(json, null, out savedVersion);
+    }
+    if (err is not null) return Results.BadRequest(new { ok = false, error = err });
+    push.Emit("refresh", JsonSerializer.SerializeToElement(new { reload = false, theme = normalized }));
+    return Results.Json(new { ok = true, theme = normalized, version = savedVersion.ToString() });
+});
 app.MapGet("/api/push/{key}", (string key, PushStore push) => push.Get(key) is { } item ? Results.Json(item) : Results.NotFound());
 app.MapMethods("/api/push/{key}", ["POST", "PUT"], async (string key, int? ttl, HttpRequest req, PushStore push) =>
 {

@@ -305,8 +305,172 @@ export function initLiveBackground() {
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, W, H);
+    const theme = document.body.dataset.theme || 'default';
+    const minDim = Math.min(W, H);
+    const musicActive = Math.min(1, energy * 2.2);
 
-    // Subtle rich dark wash
+    if (theme === 'nothing') {
+      // Nothing OS Glyph Dot-Matrix Canvas: pure OLED black, subtle breathing Glyph rings & LED dot EQ
+      ctx.fillStyle = '#050505';
+      ctx.fillRect(0, 0, W, H);
+
+      const cx = W * 0.72 + Math.sin(phase * 0.4) * W * 0.04;
+      const cy = H * 0.42 + Math.cos(phase * 0.35) * H * 0.04;
+      const baseR = minDim * (0.28 + bass * 0.10 + beatPulse * 0.14);
+
+      // Subtle monochrome Glyph arc + pulsing Nothing Red outer dot ring
+      ctx.strokeStyle = `rgba(255,255,255,${(0.08 + mid * 0.14 + beatPulse * 0.12).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1.5, minDim * 0.006);
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseR, phase * 0.3, phase * 0.3 + Math.PI * 1.35);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(215,25,33,${(0.14 + bass * 0.25 + beatPulse * 0.35).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1.5, minDim * 0.005);
+      ctx.setLineDash([2, 8]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseR * 1.24, -phase * 0.45, -phase * 0.45 + Math.PI * 0.9);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Soft Nothing Red ambient LED glow on left & beat flash
+      drawOrb(W * 0.15, H * 0.28, minDim * (0.36 + beatPulse * 0.2), [215, 25, 33], 0.07 + beatPulse * 0.14);
+      drawOrb(cx, cy, minDim * (0.42 + bass * 0.18), [255, 255, 255], 0.045 + mid * 0.06);
+
+      // Dot-matrix LED audio bars along bottom when music is playing
+      if (musicActive > 0.03) {
+        const cols = smoothBands.length;
+        const stepX = W / cols;
+        const dotStep = Math.max(5, Math.round(H * 0.032));
+        const maxDots = 7;
+        for (let i = 0; i < cols; i++) {
+          const lit = Math.round(Math.min(1, smoothBands[i] * 1.25) * maxDots * musicActive);
+          const x = (i + 0.5) * stepX;
+          for (let d = 0; d < lit; d++) {
+            const y = H - 8 - d * dotStep;
+            const isPeak = d === lit - 1 && lit >= 4;
+            ctx.fillStyle = isPeak
+              ? `rgba(215,25,33,${(0.65 * musicActive).toFixed(3)})`
+              : `rgba(245,245,245,${((0.18 + (d / maxDots) * 0.32) * musicActive).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(x, y, Math.max(1.4, dotStep * 0.28), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
+    if (theme === 'cyberpunk') {
+      // Night City Neon HUD Grid + Electric Cyan/Magenta/Yellow Plasma + Laser FFT
+      const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+      bgGrad.addColorStop(0, '#05040f');
+      bgGrad.addColorStop(0.55, '#09061d');
+      bgGrad.addColorStop(1, '#12051d');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Subtle glowing cyber HUD grid
+      const gridStep = Math.max(18, Math.round(minDim * 0.095));
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.075)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const scrollY = (phase * 14) % gridStep;
+      for (let x = 0; x <= W; x += gridStep) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+      for (let y = scrollY; y <= H; y += gridStep) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+      ctx.stroke();
+
+      ctx.globalCompositeOperation = 'lighter';
+      drawOrb(W * (0.78 + Math.sin(phase * 0.7) * 0.08), H * 0.28, minDim * (0.64 + bass * 0.3 + beatPulse * 0.35), [0, 240, 255], 0.20 + bass * 0.18 + beatPulse * 0.20);
+      drawOrb(W * (0.18 + Math.cos(phase * 0.55) * 0.08), H * 0.72, minDim * (0.60 + mid * 0.28), [255, 42, 109], 0.18 + mid * 0.18 + beatPulse * 0.14);
+      drawOrb(W * (0.48 + Math.sin(phase * 0.45) * 0.16), H * 0.15, minDim * (0.42 + high * 0.22 + beatPulse * 0.24), [252, 238, 10], 0.09 + beatPulse * 0.16);
+
+      if (musicActive > 0.03) {
+        // Neon laser FFT waveform
+        const pts = smoothBands.length;
+        ctx.beginPath();
+        for (let i = 0; i < pts; i++) {
+          const x = (i / (pts - 1)) * W;
+          const y = H * 0.93 - smoothBands[i] * H * (0.20 + beatPulse * 0.10) * musicActive;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = `rgba(252,238,10,${(0.75 * musicActive).toFixed(3)})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        drawAudioWave([0, 240, 255], [255, 42, 109], musicActive);
+      }
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
+    if (theme === 'macglass') {
+      // macOS Sonoma / Sequoia Luminous Fluid Mesh Wallpaper (built for heavy frosted Liquid Glass refraction)
+      const bgGrad = ctx.createLinearGradient(0, 0, W, H);
+      bgGrad.addColorStop(0, '#0c1836');
+      bgGrad.addColorStop(0.5, '#131b3a');
+      bgGrad.addColorStop(1, '#1a1230');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      const useArt = D.state?.media?.playing && energy > 0.03;
+      const m0 = useArt ? c0 : [56, 189, 248];   // Apple Sky Cyan
+      const m1 = useArt ? c1 : [129, 140, 248];  // Sonoma Iris Indigo
+      const m2 = useArt ? c2 : [244, 114, 182];  // Sequoia Rose Pink
+      const m3 = useArt ? hslShift(c0, 80) : [52, 211, 153]; // Aurora Mint
+
+      ctx.globalCompositeOperation = 'lighter';
+      drawOrb(W * (0.18 + Math.sin(phase * 0.42) * 0.12), H * (0.26 + Math.cos(phase * 0.36) * 0.14), minDim * (0.85 + bass * 0.25), m0, 0.34 + bass * 0.14);
+      drawOrb(W * (0.80 + Math.cos(phase * 0.38) * 0.11), H * (0.30 + Math.sin(phase * 0.44) * 0.14), minDim * (0.88 + mid * 0.24), m1, 0.32 + mid * 0.14);
+      drawOrb(W * (0.56 + Math.sin(phase * 0.34 + 1.6) * 0.18), H * (0.82 + Math.cos(phase * 0.40) * 0.10), minDim * (0.78 + high * 0.22), m2, 0.28 + high * 0.12 + beatPulse * 0.10);
+      drawOrb(W * (0.30 + Math.cos(phase * 0.30 + 2.2) * 0.15), H * (0.76 + Math.sin(phase * 0.32) * 0.10), minDim * 0.65, m3, 0.18 + beatPulse * 0.08);
+      drawAudioWave(m0, m2, musicActive * 0.85);
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
+    if (theme === 'industrial') {
+      // Industrial / Teenage Engineering Machined Gunmetal Chassis & Safety-Orange Oscilloscope
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+      bgGrad.addColorStop(0, '#191b20');
+      bgGrad.addColorStop(1, '#131519');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // Fine engineering blueprint grid + tick marks
+      const step = Math.max(16, Math.round(minDim * 0.085));
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+      for (let y = 0; y <= H; y += step) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+      ctx.stroke();
+
+      // Subtle warm amber indicator glow
+      ctx.globalCompositeOperation = 'lighter';
+      drawOrb(W * 0.78, H * 0.24, minDim * (0.45 + beatPulse * 0.22), [255, 90, 31], 0.07 + bass * 0.08 + beatPulse * 0.10);
+      drawOrb(W * 0.22, H * 0.78, minDim * 0.40, [245, 158, 11], 0.05 + mid * 0.06);
+
+      // Precision amber/orange oscilloscope trace along bottom when audio plays
+      if (musicActive > 0.03) {
+        const pts = smoothBands.length;
+        ctx.beginPath();
+        for (let i = 0; i < pts; i++) {
+          const x = (i / (pts - 1)) * W;
+          const osc = Math.sin(phase * 3.0 + i * 0.9) * 3;
+          const y = H * 0.92 - smoothBands[i] * H * 0.16 * musicActive + osc * musicActive;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = `rgba(255, 90, 31, ${(0.72 * musicActive).toFixed(3)})`;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+      }
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
+    // Subtle rich dark wash (Default / Midnight / Warm / Graphite)
     const bgGrad = ctx.createLinearGradient(0, 0, W, H);
     bgGrad.addColorStop(0, '#05070c');
     bgGrad.addColorStop(1, '#070a12');
@@ -315,7 +479,6 @@ export function initLiveBackground() {
 
     // Additive aurora / beat-reactive nebula orbs
     ctx.globalCompositeOperation = 'lighter';
-    const minDim = Math.min(W, H);
 
     // Orb 1: Primary album color behind media card (right-top), pumps with bass & beats
     const o1x = W * (0.74 + Math.sin(phase * 0.72) * 0.11);
@@ -346,7 +509,6 @@ export function initLiveBackground() {
     }
 
     // Bottom liquid FFT soundwave ribbon when music is playing
-    const musicActive = Math.min(1, energy * 2.2);
     drawAudioWave(c0, c1, musicActive);
 
     raf = requestAnimationFrame(frame);

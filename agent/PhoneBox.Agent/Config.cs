@@ -178,8 +178,10 @@ public sealed class DisplayConfig
     public bool VolumeKeys { get; set; } = true;
     /// <summary>landscape, portrait or auto (follow the phone). In portrait the widgets are arranged automatically.</summary>
     public string Orientation { get; set; } = "landscape";
-    /// <summary>default, amoled, midnight, warm or graphite.</summary>
+    /// <summary>default, nothing, cyberpunk, macglass, industrial, amoled, midnight, warm or graphite.</summary>
     public string Theme { get; set; } = "default";
+    /// <summary>Visual themes recognized by the panel and desktop studio.</summary>
+    internal static readonly string[] Themes = ["default", "nothing", "cyberpunk", "macglass", "industrial", "amoled", "midnight", "warm", "graphite"];
     /// <summary>Accent colour (background glow, page dots), e.g. "#2dd4bf".</summary>
     public string Accent { get; set; } = "#2dd4bf";
     /// <summary>Tint the background with the album art's colour while music plays.</summary>
@@ -619,6 +621,8 @@ public sealed partial class ConfigStore(string path)
         // so "PT-br" still resolves, but stored in its canonical casing: i18n.js looks pt-BR up by exact code.
         var lang = (c.Display.Language ?? "").Trim();
         c.Display.Language = DisplayConfig.Languages.FirstOrDefault(l => l.Equals(lang, StringComparison.OrdinalIgnoreCase)) ?? "auto";
+        var theme = (c.Display.Theme ?? "").Trim();
+        c.Display.Theme = DisplayConfig.Themes.FirstOrDefault(t => t.Equals(theme, StringComparison.OrdinalIgnoreCase)) ?? "default";
         c.Display.SwitchCountdownSec = Math.Clamp(c.Display.SwitchCountdownSec, 0, 30);
         c.Display.TouchGraceSec = Math.Clamp(c.Display.TouchGraceSec, 0, 600);
         c.Display.MinDwellSec = Math.Clamp(c.Display.MinDwellSec, 0, 600);
