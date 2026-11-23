@@ -31,9 +31,11 @@ public sealed class MainWindow : Form
     [
         ("default", "Style: Default"),
         ("nothing", "Style: Nothing OS"),
+        ("nothing-light", "Style: Nothing Light"),
         ("cyberpunk", "Style: Cyberpunk"),
         ("macglass", "Style: MacBook Glass"),
         ("industrial", "Style: Industrial"),
+        ("retro", "Style: Retro CRT"),
         ("amoled", "Style: AMOLED"),
         ("midnight", "Style: Midnight"),
         ("warm", "Style: Warm"),

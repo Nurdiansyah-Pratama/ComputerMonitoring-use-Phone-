@@ -517,6 +517,19 @@ class MainActivity : Activity(), SensorEventListener {
         @JavascriptInterface
         fun dismissNotif(key: String, notifKey: String) { if (ok(key)) PhoneNotifListener.dismiss(notifKey) }
 
+        /** Copies plain text from the panel (e.g. PC clipboard sync) into Android's system clipboard. */
+        @JavascriptInterface
+        fun copyText(key: String, text: String): Boolean {
+            if (!ok(key)) return false
+            return try {
+                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager ?: return false
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("PhoneBox", text))
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+
         /** True when the Wake button can work: the active computer's MACs are known and the phone is on a local network. */
         @JavascriptInterface
         fun canWake(key: String): Boolean = ok(key) && link.canWake()

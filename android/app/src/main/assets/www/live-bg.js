@@ -363,6 +363,84 @@ export function initLiveBackground() {
       return;
     }
 
+    if (theme === 'nothing-light') {
+      // Nothing OS Light Paper Canvas: matte paper white with subtle charcoal Glyph arcs & Nothing Red LEDs
+      ctx.fillStyle = '#efefe9';
+      ctx.fillRect(0, 0, W, H);
+
+      const cx = W * 0.72 + Math.sin(phase * 0.4) * W * 0.04;
+      const cy = H * 0.42 + Math.cos(phase * 0.35) * H * 0.04;
+      const baseR = minDim * (0.28 + bass * 0.10 + beatPulse * 0.14);
+
+      ctx.strokeStyle = `rgba(18,18,18,${(0.10 + mid * 0.14).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1.5, minDim * 0.006);
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseR, phase * 0.3, phase * 0.3 + Math.PI * 1.35);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(215,25,33,${(0.18 + bass * 0.25 + beatPulse * 0.35).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1.5, minDim * 0.005);
+      ctx.setLineDash([2, 8]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseR * 1.24, -phase * 0.45, -phase * 0.45 + Math.PI * 0.9);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (musicActive > 0.03) {
+        const cols = smoothBands.length;
+        const stepX = W / cols;
+        const dotStep = Math.max(5, Math.round(H * 0.032));
+        const maxDots = 7;
+        for (let i = 0; i < cols; i++) {
+          const lit = Math.round(Math.min(1, smoothBands[i] * 1.25) * maxDots * musicActive);
+          const x = (i + 0.5) * stepX;
+          for (let d = 0; d < lit; d++) {
+            const y = H - 8 - d * dotStep;
+            const isPeak = d === lit - 1 && lit >= 4;
+            ctx.fillStyle = isPeak
+              ? `rgba(215,25,33,${(0.75 * musicActive).toFixed(3)})`
+              : `rgba(18,18,18,${((0.18 + (d / maxDots) * 0.30) * musicActive).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(x, y, Math.max(1.4, dotStep * 0.28), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
+    if (theme === 'retro') {
+      // Classic Phosphor CRT Green Terminal Grid + Oscilloscope
+      ctx.fillStyle = '#030a04';
+      ctx.fillRect(0, 0, W, H);
+      const step = Math.max(16, Math.round(minDim * 0.09));
+      ctx.strokeStyle = 'rgba(51, 255, 102, 0.07)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+      for (let y = 0; y <= H; y += step) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+      ctx.stroke();
+
+      ctx.globalCompositeOperation = 'lighter';
+      drawOrb(W * 0.5, H * 0.5, minDim * (0.75 + beatPulse * 0.2), [51, 255, 102], 0.08 + bass * 0.08 + beatPulse * 0.10);
+      if (musicActive > 0.03) {
+        const pts = smoothBands.length;
+        ctx.beginPath();
+        for (let i = 0; i < pts; i++) {
+          const x = (i / (pts - 1)) * W;
+          const y = H * 0.90 - smoothBands[i] * H * 0.22 * musicActive;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = `rgba(51, 255, 102, ${(0.85 * musicActive).toFixed(3)})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      raf = requestAnimationFrame(frame);
+      return;
+    }
+
     if (theme === 'cyberpunk') {
       // Night City Neon HUD Grid + Electric Cyan/Magenta/Yellow Plasma + Laser FFT
       const bgGrad = ctx.createLinearGradient(0, 0, W, H);

@@ -28,6 +28,7 @@
     <PackageReference Include="NAudio" Version="3.3.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.4" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3179.45" />
+    <PackageReference Include="System.Management" Version="9.0.4" />
   </ItemGroup>
 
   <PropertyGroup Condition="!$(TargetFramework.Contains('-windows'))">
@@ -65,6 +66,7 @@
     <!-- the phone's panel, served at /panel/ for the live preview in the layout editor -->
     <EmbeddedResource Include="..\..\android\app\src\main\assets\www\*.*" LogicalName="www/%(Filename)%(Extension)" />
     <EmbeddedResource Include="..\..\android\app\src\main\assets\www\widgets\*.*" LogicalName="www/widgets/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\android\app\src\main\assets\www\fonts\*.*" LogicalName="www/fonts/%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

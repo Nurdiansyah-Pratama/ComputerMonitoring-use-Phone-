@@ -95,6 +95,7 @@ builder.Services.AddSingleton<HomeAssistant>();
 builder.Services.AddSingleton<AppConsole>();
 builder.Services.AddSingleton<Dictation>();
 builder.Services.AddSingleton<SpectrumAnalyzer>();
+builder.Services.AddSingleton<AudioMixer>();
 builder.Services.AddSingleton(sp => new AsusControl(configDir, sp.GetRequiredService<ILogger<AsusControl>>()));
 AddMonitor<SystemMonitor>(builder.Services);
 AddMonitor<MediaMonitor>(builder.Services);
@@ -379,13 +380,16 @@ app.MapGet("/panel/{*file}", (string? file, HttpRequest req) =>
 {
     if (string.IsNullOrEmpty(file) && !req.Path.Value!.EndsWith('/')) return Results.Redirect("/panel/" + req.QueryString);
     file = string.IsNullOrEmpty(file) ? "index.html" : file;
-    // index.html, main.js, style.css… and the widget modules in widgets/
-    if (!System.Text.RegularExpressions.Regex.IsMatch(file, @"^(widgets/)?[A-Za-z0-9_.-]+$") || file.Contains("..")) return Results.NotFound();
+    // index.html, main.js, style.css… and the widget modules in widgets/ or fonts in fonts/
+    if (!System.Text.RegularExpressions.Regex.IsMatch(file, @"^(widgets/|fonts/)?[A-Za-z0-9_.-]+$") || file.Contains("..")) return Results.NotFound();
     var type = Path.GetExtension(file) switch
     {
         ".html" => "text/html; charset=utf-8",
         ".js" => "text/javascript; charset=utf-8",
         ".css" => "text/css; charset=utf-8",
+        ".woff2" => "font/woff2",
+        ".woff" => "font/woff",
+        ".ttf" => "font/ttf",
         _ => "application/octet-stream",
     };
     return AppPaths.Resource("www/" + file) is { } s ? Results.Stream(s, type) : Results.NotFound();
@@ -538,6 +542,92 @@ app.MapPost("/api/asus/battery", (int? limit, AsusControl asus) =>
     var (ok, error, state) = asus.SetBatteryLimit(limit ?? 80);
     return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
 });
+app.MapPost("/api/asus/adaptive", (bool? enabled, AsusControl asus) =>
+{
+    var (ok, error, state) = asus.SetAdaptiveRefresh(enabled == true);
+    return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
+});
+app.MapPost("/api/asus/brightness", (int? level, AsusControl asus) =>
+{
+    var (ok, error, state) = asus.SetBrightness(level ?? 50);
+    return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
+});
+app.MapPost("/api/asus/keyboard", (int? level, AsusControl asus) =>
+{
+    var (ok, error, state) = asus.SetKeyboardBacklight(level ?? 0);
+    return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
+});
+
+// Windows Audio Output Switcher + Per-App Volume Mixer
+app.MapGet("/api/audio/mixer", (AudioMixer mixer, AudioControl audio) => Results.Json(mixer.Snapshot(audio)));
+app.MapPost("/api/audio/output", (string? id, AudioMixer mixer, AudioControl audio) =>
+{
+    var (ok, error, state) = mixer.SetDefaultOutput(id, audio);
+    if (ok) StateSignal.Poke();
+    return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
+});
+app.MapPost("/api/audio/app", (string? key, int? volume, bool? mute, AudioMixer mixer, AudioControl audio) =>
+{
+    var (ok, error, state) = mixer.SetAppAudio(key, volume, mute, audio);
+    return ok ? Results.Json(new { ok = true, state }) : Results.BadRequest(new { ok = false, error, state });
+});
+
+// Two-way Clipboard & Quick Send (Phone <-> PC)
+var clipboardHistory = new List<string>();
+var clipboardLock = new Lock();
+void RecordClipboard(string text)
+{
+    if (string.IsNullOrWhiteSpace(text)) return;
+    var trimmed = text.Length > 2000 ? text[..2000] : text;
+    lock (clipboardLock)
+    {
+        clipboardHistory.RemoveAll(x => string.Equals(x, trimmed, StringComparison.Ordinal));
+        clipboardHistory.Insert(0, trimmed);
+        if (clipboardHistory.Count > 6) clipboardHistory.RemoveRange(6, clipboardHistory.Count - 6);
+    }
+}
+app.MapGet("/api/clipboard", () =>
+{
+    var text = "";
+    try { text = PhoneBox.Agent.Clipboard.GetText(); } catch { }
+    if (text.Length > 2000) text = text[..2000];
+    RecordClipboard(text);
+    string[] hist;
+    lock (clipboardLock) hist = clipboardHistory.ToArray();
+    return Results.Json(new { text, history = hist });
+});
+app.MapPost("/api/clipboard", async (string? text, bool? openUrl, HttpRequest req) =>
+{
+    var val = text ?? "";
+    var shouldOpen = openUrl == true;
+    if (string.IsNullOrEmpty(val) && req.ContentLength is > 0 and < 32_768)
+    {
+        try
+        {
+            using var doc = await JsonDocument.ParseAsync(req.Body);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                if (doc.RootElement.TryGetProperty("text", out var tProp) && tProp.ValueKind == JsonValueKind.String)
+                    val = tProp.GetString() ?? "";
+                if (doc.RootElement.TryGetProperty("openUrl", out var oProp) && oProp.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                    shouldOpen = oProp.GetBoolean();
+            }
+        }
+        catch { }
+    }
+    if (val.Length > 10_000) val = val[..10_000];
+    try { PhoneBox.Agent.Clipboard.SetText(val); }
+    catch (Exception ex) { return Results.BadRequest(new { ok = false, error = ex.Message }); }
+    RecordClipboard(val);
+    if (shouldOpen && (val.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || val.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+    {
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(val) { UseShellExecute = true }); }
+        catch { }
+    }
+    string[] hist;
+    lock (clipboardLock) hist = clipboardHistory.ToArray();
+    return Results.Json(new { ok = true, text = val, history = hist });
+});
 app.MapPost("/api/theme", async (string? theme, HttpRequest req, ConfigStore cfg, PushStore push) =>
 {
     var chosen = (theme ?? "").Trim();
@@ -626,6 +716,7 @@ object State(IServiceProvider sp, long? ev)
         obs = sp.GetRequiredService<ObsMonitor>().Snapshot() is { Connected: true } o ? new { o.Streaming, o.Recording, o.RecordPaused } : null,
         toggles = Shortcuts.States(sp.GetRequiredService<ConfigStore>().Get(), push, sp.GetRequiredService<AudioControl>()),
         cycles = Shortcuts.CycleStates(sp.GetRequiredService<ConfigStore>().Get()),
+        running = Shortcuts.RunningIds(sp.GetRequiredService<ConfigStore>().Get().Shortcuts),
     };
 }
 

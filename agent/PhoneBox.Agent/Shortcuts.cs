@@ -60,6 +60,65 @@ public static class Shortcuts
         return [name];
     }
 
+    private static readonly Lock RunningLock = new();
+    private static long _runningCacheAt;
+    private static string[] _runningCache = [];
+
+    /// <summary>Returns IDs of app shortcuts currently running on this computer (cached for 1.5s).</summary>
+    public static string[] RunningIds(IReadOnlyList<Shortcut> shortcuts)
+    {
+        if (shortcuts.Count == 0) return [];
+        lock (RunningLock)
+        {
+            var now = Environment.TickCount64;
+            if (now - _runningCacheAt < 1500) return _runningCache;
+            _runningCacheAt = now;
+            try
+            {
+                var browser = DefaultBrowserProcessName();
+                var activeProcs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var p in Process.GetProcesses())
+                {
+                    try
+                    {
+                        if (!string.IsNullOrWhiteSpace(p.ProcessName))
+                            activeProcs.Add(p.ProcessName);
+                    }
+                    catch { }
+                    finally { p.Dispose(); }
+                }
+#if WINDOWS
+                var hasExplorerWin = FindExplorerWindow() != 0;
+#else
+                var hasExplorerWin = false;
+#endif
+                var result = new List<string>();
+                foreach (var sc in shortcuts)
+                {
+                    if (!IsClosable(sc)) continue;
+                    // Never mark screenshot snipping tool as persistently running
+                    if (sc.Cmd.Trim().StartsWith("ms-screenclip:", StringComparison.OrdinalIgnoreCase)) continue;
+                    var targets = ResolveCloseTargets(sc.Cmd, browser);
+                    var running = targets.Any(t =>
+                        t == "__explorer_windows__" ? hasExplorerWin : activeProcs.Contains(t));
+                    if (running) result.Add(sc.Id);
+                }
+                _runningCache = result.ToArray();
+            }
+            catch
+            {
+                _runningCache = [];
+            }
+            return _runningCache;
+        }
+    }
+
+    /// <summary>Invalidates the cached running-app list immediately (after launch or close).</summary>
+    public static void InvalidateRunningCache()
+    {
+        lock (RunningLock) { _runningCacheAt = 0; }
+    }
+
     /// <summary>Closes the application associated with shortcut [id].</summary>
     public static (int Closed, string? Error) Close(AgentConfig cfg, string id, ILogger log)
     {
@@ -119,6 +178,7 @@ public static class Shortcuts
                 }
             }
             log.LogInformation("shortcut close: {Label} ({Closed} closed)", sc.Label, closed);
+            InvalidateRunningCache();
             return (closed, null);
         }
         catch (Exception ex)
@@ -489,9 +549,15 @@ public static class Shortcuts
         var cwd = string.IsNullOrEmpty(sc.Cwd) ? null : Home(sc.Cwd);
 #if WINDOWS
         LetTheNewWindowComeForward();
+        if (TryFocusExistingWindow(sc))
+        {
+            InvalidateRunningCache();
+            return;
+        }
         try
         {
             ShellLaunchWindows(file, args, cwd);
+            InvalidateRunningCache();
         }
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 2 /* not found */ && TerminalStandIns(sc.Cmd)
             .Select(t => Path.Combine(Environment.SystemDirectory, t == "powershell.exe" ? @"WindowsPowerShell\v1.0\powershell.exe" : t))
@@ -616,11 +682,93 @@ public static class Shortcuts
         public nint hProcess;
     }
 
+    private static bool TryFocusExistingWindow(Shortcut sc)
+    {
+        if (!IsClosable(sc)) return false;
+        if (!string.IsNullOrWhiteSpace(sc.Args)) return false;
+        var cmd = sc.Cmd.Trim().ToLowerInvariant();
+        if (cmd.StartsWith("ms-screenclip:", StringComparison.Ordinal)) return false;
+        var targets = ResolveCloseTargets(sc.Cmd, DefaultBrowserProcessName());
+        if (targets.Length == 0) return false;
+        try
+        {
+            foreach (var target in targets)
+            {
+                if (target == "__explorer_windows__")
+                {
+                    var hwnd = FindExplorerWindow();
+                    if (hwnd != 0)
+                    {
+                        BringWindowForward(hwnd);
+                        return true;
+                    }
+                    continue;
+                }
+                if (ProtectedProcesses.Contains(target)) continue;
+                var procs = Process.GetProcessesByName(target);
+                try
+                {
+                    foreach (var p in procs)
+                    {
+                        try
+                        {
+                            if (p.HasExited) continue;
+                            if (p.MainWindowHandle != 0)
+                            {
+                                BringWindowForward(p.MainWindowHandle);
+                                return true;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                finally
+                {
+                    foreach (var p in procs) p.Dispose();
+                }
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    private static void BringWindowForward(nint hwnd)
+    {
+        if (IsIconic(hwnd)) ShowWindow(hwnd, 9 /* SW_RESTORE */);
+        else ShowWindow(hwnd, 5 /* SW_SHOW */);
+        SetForegroundWindow(hwnd);
+    }
+
+    private static nint FindExplorerWindow()
+    {
+        nint found = 0;
+        var sb = new System.Text.StringBuilder(64);
+        EnumWindows((hwnd, _) =>
+        {
+            if (!IsWindowVisible(hwnd)) return true;
+            sb.Clear();
+            if (GetClassNameW(hwnd, sb, sb.Capacity) > 0 && sb.ToString() == "CabinetWClass")
+            {
+                found = hwnd;
+                return false;
+            }
+            return true;
+        }, 0);
+        return found;
+    }
+
+    private delegate bool EnumWindowsProc(nint hwnd, nint lParam);
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool ShellExecuteExW(ref SHELLEXECUTEINFO lpExecInfo);
     [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(int processId);
     [DllImport("user32.dll")] private static extern bool LockWorkStation();
     [DllImport("user32.dll")] private static extern bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
+    [DllImport("user32.dll")] private static extern bool SetForegroundWindow(nint hWnd);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(nint hWnd, int nCmdShow);
+    [DllImport("user32.dll")] private static extern bool IsIconic(nint hWnd);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(nint hWnd);
+    [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, nint lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassNameW(nint hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
 #else
     private static void Unix(string tool, params string[] args)
     {

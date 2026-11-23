@@ -1,6 +1,41 @@
 <p align="center"><img src="agent/PhoneBox.Agent/phonebox.ico" width="72" alt="PhoneBox icon"></p>
 
-<h1 align="center">PhoneBox</h1>
+<h1 align="center">PhoneBox — ComputerMonitoring-use-Phone Studio Edition</h1>
+
+<p align="center"><b>Ubah HP Android menjadi Desk Panel & Hardware Controller interaktif untuk Laptop/PC via Wi-Fi & USB.</b><br>
+Fork kustom dari <a href="https://github.com/ersinkoc/phonebox">ersinkoc/phonebox</a> oleh <a href="https://github.com/Nurdiansyah-Pratama/ComputerMonitoring-use-Phone-">Nurdiansyah-Pratama</a>.</p>
+
+### ✨ Fitur Tambahan di Fork Ini
+
+- **Desktop Studio GUI (Windows Single-File `.exe`)** — Jendela aplikasi native Windows (WebView2) lengkap dengan toolbar status koneksi HP, **Editor Tampilan**, **Live Preview**, **Quick Style Switcher**, **QR Wi-Fi Pairing**, dan **Buka di HP (USB)** tanpa harus lewat browser manual.
+- **6 Signature Visual Styles + Live Audio-Reactive Canvas** — Ganti gaya dalam 1 tap dari HP (tombol palet di bawah / Overview) atau Desktop Studio:
+  - **Nothing OS** & **Nothing OS Light** (font dot-matrix **Doto** offline + animasi Glyph LED & equalizer titik-titik)
+  - **Cyberpunk 2077** (Night City Neon HUD dengan sudut *chamfered*, CRT scanlines & laser FFT)
+  - **MacBook Glass** (macOS Liquid Glass blur dalam + specular rim + fluid mesh wallpaper)
+  - **Industrial** (CNC anodized gunmetal ala Teenage Engineering/Braun + 4 corner rivets + Safety Orange)
+  - **Retro CRT** (terminal phosphor hijau klasik + osiloskop audio)
+- **MyASUS Laptop Hardware Control (Tanpa Admin)** — Atur langsung dari HP via Win32 & `\\.\ATKACPI`:
+  - **Display Refresh Rate** (`60 Hz / 120 Hz` fixed + tombol opt-in `Auto` / Adaptive)
+  - **Screen Brightness Slider** (0–100% via WMI)
+  - **Keyboard Backlight** (`Off / Low / Med / Max`)
+  - **ASUS Fan Profile** (`Whisper / Standard / Performance`)
+  - **Battery Health Charging** (`60% / 80% / 100%`)
+- **Audio Output Switcher & Per-App Volume Mixer** — Pindah output audio Windows (Speaker ↔ Headset ↔ TWS Bluetooth) dalam 1 tap + atur volume & mute tiap aplikasi (Spotify, Browser, Discord, Game) secara terpisah.
+- **Two-Way Clipboard & Quick Send** — Sinkronisasi clipboard Laptop ↔ HP & kirim/buka URL langsung di browser laptop lewat Wi-Fi.
+- **Seamless Wi-Fi Auto-Discovery & Notifikasi Windows 11** — UDP auto-discovery (`8767`) saat IP DHCP berubah, penerusan semua notifikasi Windows 11 lewat Wi-Fi & USB ke area bawah cuaca, indikator LED *running app* + focus-on-tap + tombol `×` tutup aplikasi di pojok kanan atas tiap tile, dan dukungan penuh **Bahasa Indonesia (`id`)**.
+
+### 🚀 Cara Build Sendiri
+- **Windows Agent (`.exe` self-contained):**
+  ```powershell
+  dotnet publish agent/PhoneBox.Agent/PhoneBox.Agent.csproj -c Release -f net10.0-windows10.0.19041.0 -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist/PhoneBox-win-x64
+  ```
+- **Android APK:**
+  ```powershell
+  cd android
+  .\gradlew.bat assembleRelease
+  ```
+
+---
 
 <p align="center">
   <b>English</b> ·

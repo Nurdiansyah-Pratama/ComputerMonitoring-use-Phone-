@@ -11,10 +11,12 @@ public sealed class ThemeTests
     [InlineData("default", "default")]
     [InlineData("nothing", "nothing")]
     [InlineData("NOTHING", "nothing")]
+    [InlineData("nothing-light", "nothing-light")]
     [InlineData("cyberpunk", "cyberpunk")]
     [InlineData("macglass", "macglass")]
     [InlineData("MacGlass", "macglass")]
     [InlineData("industrial", "industrial")]
+    [InlineData("retro", "retro")]
     [InlineData("amoled", "amoled")]
     [InlineData("midnight", "midnight")]
     [InlineData("warm", "warm")]
@@ -58,5 +60,10 @@ public sealed class ThemeTests
         Assert.Contains("body[data-theme=\"cyberpunk\"]", css);
         Assert.Contains("body[data-theme=\"macglass\"]", css);
         Assert.Contains("body[data-theme=\"industrial\"]", css);
+        Assert.Contains("body[data-theme=\"nothing-light\"]", css);
+        Assert.Contains("body[data-theme=\"retro\"]", css);
+        using var font = AppPaths.Resource("www/fonts/doto.woff2");
+        Assert.NotNull(font);
+        Assert.True(font!.Length > 1000);
     }
 }

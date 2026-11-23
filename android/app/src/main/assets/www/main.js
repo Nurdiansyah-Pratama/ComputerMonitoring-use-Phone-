@@ -17,6 +17,8 @@ import './widgets/dictate.js';
 import './widgets/camera.js';
 import './widgets/spectrum.js';
 import './widgets/asus.js';
+import './widgets/audio.js';
+import './widgets/clipboard.js';
 import { extractPalette, initLiveBackground } from './live-bg.js';
 export { extractPalette };
 
@@ -56,7 +58,7 @@ export const $ = (id) => document.getElementById(id);
 // The native bridge (window.Android) is in every frame, sandboxed widgets included, so each call carries a key that only
 // the panel's own frames receive (MainActivity.bridgeKey). This wrapper adds it.
 const BRIDGE = ['battery', 'buzz', 'haptic', 'is24Hour', 'pcs', 'selectPc', 'forgetPc', 'setBrightness', 'setHomeScreen', 'setOrientation',
-  'setPinned', 'setVolumeKeys', 'transport', 'sensors', 'version', 'canListen', 'listen', 'stopListening', 'cancelListening', 'trackpad', 'canWake', 'wakePc', 'recentNotifs', 'dismissNotif'];
+  'setPinned', 'setVolumeKeys', 'transport', 'sensors', 'version', 'canListen', 'listen', 'stopListening', 'cancelListening', 'trackpad', 'canWake', 'wakePc', 'recentNotifs', 'dismissNotif', 'copyText'];
 export const bridge = typeof Android === 'undefined' ? null : Object.fromEntries(BRIDGE.filter((m) => typeof Android[m] === 'function')
   .map((m) => [m, (...args) => Android[m](window.__phoneboxKey || '', ...args)]));
 // Live preview inside the agent's layout editor: the layout comes from the editor (unsaved), not from the agent.
@@ -365,6 +367,8 @@ const ICONS = {
   'folders': 'M20 17a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3.9a2 2 0 0 1-1.69-.9l-.81-1.2a2 2 0 0 0-1.67-.9H8a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2Z|M2 8v11a2 2 0 0 0 2 2h14',
   'music-2': 'M4 18a4 4 0 1 0 8 0a4 4 0 1 0 -8 0|M12 18V2l7 4',
   'palette': 'M13 6.5a0.5 0.5 0 1 0 1 0a0.5 0.5 0 1 0 -1 0|M17 10.5a0.5 0.5 0 1 0 1 0a0.5 0.5 0 1 0 -1 0|M8 7.5a0.5 0.5 0 1 0 1 0a0.5 0.5 0 1 0 -1 0|M6 12.5a0.5 0.5 0 1 0 1 0a0.5 0.5 0 1 0 -1 0|M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z',
+  'clipboard': 'M9 4h6a1 1 0 0 1 1 1v2H8V5a1 1 0 0 1 1-1z|M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2',
+  'refresh-cw': 'M3 12a9 9 0 0 1 15-6.7L21 8|M21 3v5h-5|M21 12a9 9 0 0 1-15 6.7L3 16|M3 21v-5h5',
   'piano': 'M18.5 8c-1.4 0-2.6-.8-3.2-2A6.87 6.87 0 0 0 2 9v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-8.5C22 9.6 20.4 8 18.5 8|M2 14h20|M6 14v4|M10 14v4|M14 14v4|M18 14v4',
   'projector': 'M5 7 3 5|M9 6V3|m13 7 2-2|M6 13a3 3 0 1 0 6 0a3 3 0 1 0 -6 0|M11.83 12H20a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h2.17|M16 16h2',
   'puzzle': 'M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z',
@@ -1546,7 +1550,7 @@ export function handleEvent(e) {
 export const WIDGET_ICONS = { camera: '📹', dictate: '🎙️', spectrum: '📶', 'app-console': '🎛️', discord: '💬', steam: '👥', 'steam-activity': '🔔', rules: '⚡', chargecare: '🔋', nextup: '⏭️', moon: '🌙', wordclock: '🔤', clock: '🕒', weather: '⛅', forecast: '🌦️', media: '🎵', stat: '📈', gauge: '⏲️', chart: '📊', meters: '💾', gpu: '🎮', quotas: '✳️', sessions: '🤖',
   github: '🐙', processes: '⚙️', shortcuts: '🎛️', button: '🔘', worldclock: '🌍', calendar: '📅', pomodoro: '🍅', countdown: '⏳', note: '📝', command: '💻',
   push: '📡', inbox: '📬', label: '🔤', analog: '🕰️', progress: '📆', stopwatch: '⏱️', timer: '⏲️', counter: '🔢', breathe: '🫁', quote: '💬',
-  checklist: '✅', battery: '🔋', topprocs: '🔥', quotaring: '🎯', volume: '🔊', sun: '🌅', air: '🍃', hackernews: '📰', feeds: '🗞️', photos: '🖼️', exchange: '💱', crypto: '🪙', image: '🖼️', pcswitch: '🖥️' };
+  checklist: '✅', battery: '🔋', topprocs: '🔥', quotaring: '🎯', volume: '🔊', sun: '🌅', air: '🍃', hackernews: '📰', feeds: '🗞️', photos: '🖼️', exchange: '💱', crypto: '🪙', image: '🖼️', pcswitch: '🖥️', asus: '💻', audiomixer: '🎚️', clipboard: '📋' };
 
 // ================================================================= pages
 export const pager = $('pager');
@@ -1741,7 +1745,14 @@ export function buildDots() {
     e.stopPropagation();
     togglePagePaused();
   });
-  dots.replaceChildren(...pages.map(() => h('i')), pagePauseBtn);
+  const styleBtn = h('button', 'style-btn', icon('palette'));
+  styleBtn.type = 'button';
+  styleBtn.setAttribute('aria-label', 'Switch style');
+  styleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleStylePopover();
+  });
+  dots.replaceChildren(...pages.map(() => h('i')), pagePauseBtn, styleBtn);
   dots.hidden = false;
   syncPagePauseUi();
 }
@@ -2041,15 +2052,51 @@ pager.addEventListener('scroll', onScroll, { passive: true });
 const PANEL_THEMES = [
   { id: 'default', label: 'Default', swatch: 'linear-gradient(135deg,#2dd4bf,#6366f1)' },
   { id: 'nothing', label: 'Nothing OS', swatch: 'linear-gradient(135deg,#111 50%,#d71921 50%)' },
+  { id: 'nothing-light', label: 'Nothing Light', swatch: 'linear-gradient(135deg,#f2f2ef 50%,#d71921 50%)' },
   { id: 'cyberpunk', label: 'Cyberpunk', swatch: 'linear-gradient(135deg,#00f0ff 45%,#fcee0a 55%)' },
   { id: 'macglass', label: 'MacBook Glass', swatch: 'linear-gradient(135deg,#38bdf8,#a855f7,#f472b6)' },
   { id: 'industrial', label: 'Industrial', swatch: 'linear-gradient(135deg,#2b3038 50%,#ff5a1f 50%)' },
+  { id: 'retro', label: 'Retro CRT', swatch: 'linear-gradient(135deg,#041307 50%,#33ff66 50%)' },
   { id: 'amoled', label: 'AMOLED', swatch: '#000000' },
   { id: 'midnight', label: 'Midnight', swatch: 'linear-gradient(135deg,#0c1738,#60a5fa)' },
   { id: 'warm', label: 'Warm', swatch: 'linear-gradient(135deg,#2a1911,#f59e0b)' },
   { id: 'graphite', label: 'Graphite', swatch: 'linear-gradient(135deg,#272b33,#9ca3af)' },
 ];
 const VALID_THEMES = PANEL_THEMES.map((x) => x.id);
+
+let stylePopEl = null;
+function closeStylePopover() {
+  if (stylePopEl) stylePopEl.hidden = true;
+}
+function renderStylePopover() {
+  if (!stylePopEl) {
+    stylePopEl = h('div', 'style-pop');
+    stylePopEl.id = 'stylePop';
+    stylePopEl.hidden = true;
+    document.body.appendChild(stylePopEl);
+    document.addEventListener('click', (e) => {
+      if (stylePopEl && !stylePopEl.hidden && !stylePopEl.contains(e.target) && !e.target.closest('.style-btn')) {
+        stylePopEl.hidden = true;
+      }
+    });
+  }
+  const cur = document.body.dataset.theme || 'default';
+  stylePopEl.replaceChildren(...PANEL_THEMES.map((th) => {
+    const sw = h('span', 'sw');
+    sw.style.background = th.swatch;
+    const btn = h('button', 'ov-th' + (cur === th.id ? ' on' : ''), sw, th.label);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectThemeFromPanel(th.id);
+    });
+    return btn;
+  }));
+}
+function toggleStylePopover() {
+  haptic();
+  renderStylePopover();
+  stylePopEl.hidden = !stylePopEl.hidden;
+}
 
 async function selectThemeFromPanel(id) {
   if (!VALID_THEMES.includes(id)) return;
@@ -2058,6 +2105,7 @@ async function selectThemeFromPanel(id) {
   store.set('cfg', cfg);
   applyDisplay();
   renderOverviewThemes();
+  if (stylePopEl && !stylePopEl.hidden) renderStylePopover();
   const item = PANEL_THEMES.find((x) => x.id === id);
   toast(`Style: ${item ? item.label : id}`);
   if (PREVIEW) return;
@@ -2139,7 +2187,7 @@ $('dots').addEventListener('pointerdown', (e) => {
   clearDotsHold();
   if (pages.length < 2 || dimmed || document.body.classList.contains('waking')) return;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
-  if (e.target.closest('.page-pause')) return;
+  if (e.target.closest('.page-pause, .style-btn')) return;
   dotsHoldStart = [e.clientX, e.clientY];
   dotsHoldTimer = setTimeout(() => {
     dotsHoldTimer = 0;
@@ -2162,7 +2210,7 @@ $('dots').addEventListener('click', (e) => {
       return;
     }
   }
-  if (e.target.closest('.page-pause')) return;
+  if (e.target.closest('.page-pause, .style-btn')) return;
   openOverview();
 });
 

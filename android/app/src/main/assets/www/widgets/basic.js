@@ -950,7 +950,9 @@ W.processes = {
 // On / off keys light up from the agent's state (D.state.toggles: { id: true | false }).
 export function applyToggles(root) {
   const t = D.state?.toggles || {};
+  const running = new Set(Array.isArray(D.state?.running) ? D.state.running : []);
   root.querySelectorAll('.key.toggle').forEach((b) => b.classList.toggle('on', t[b.dataset.id] === true));
+  root.querySelectorAll('.key').forEach((b) => b.classList.toggle('app-running', running.has(b.dataset.id)));
   applyCycles(root);
 }
 

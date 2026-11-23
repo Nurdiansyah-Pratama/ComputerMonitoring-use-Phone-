@@ -479,9 +479,11 @@ nav a.on::before { color: var(--accent); }
 .tg-sub { font-size: 11px; color: var(--muted); line-height: 1.25; }
 .tg-prev.p-default { background: radial-gradient(circle at 80% 20%, rgba(45,212,191,.38), transparent 60%), #070a10; color: #eef2f6; }
 .tg-prev.p-nothing { background: radial-gradient(rgba(255,255,255,.18) 1px, transparent 1px) 0 0/7px 7px, #070707; color: #fff; font-family: ui-monospace, monospace; border: 1px dotted rgba(255,255,255,.32); }
+.tg-prev.p-nothing-light { background: radial-gradient(rgba(18,18,18,.18) 1px, transparent 1px) 0 0/7px 7px, #efefe9; color: #121212; font-family: ui-monospace, monospace; border: 1px dotted rgba(18,18,18,.35); }
 .tg-prev.p-cyberpunk { background: linear-gradient(135deg, #070517, #16092d); color: #fcee0a; font-family: ui-monospace, monospace; border: 1px solid #00f0ff; border-top: 2px solid #fcee0a; border-radius: 2px; clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px)); }
 .tg-prev.p-macglass { background: linear-gradient(135deg, #2563eb, #8b5cf6 52%, #ec4899); color: #fff; border: 1px solid rgba(255,255,255,.45); box-shadow: inset 0 1px 0 rgba(255,255,255,.55); }
 .tg-prev.p-industrial { background: linear-gradient(180deg, #2c3139, #1c1f25); color: #eceef2; font-family: ui-monospace, monospace; border: 1px solid #49515e; border-radius: 4px; box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+.tg-prev.p-retro { background: #030a04; color: #33ff66; font-family: ui-monospace, monospace; border: 1px solid rgba(51,255,102,.55); border-radius: 2px; }
 .tg-prev.p-amoled { background: #000; color: #eef2f6; border-color: rgba(255,255,255,.14); }
 .tg-prev.p-midnight { background: linear-gradient(135deg, #070c1e, #101b3d); color: #eef2f6; border-color: rgba(140,170,255,.28); }
 .tg-prev.p-warm { background: linear-gradient(135deg, #120b08, #24150e); color: #f6ede5; border-color: rgba(255,196,150,.24); }
@@ -723,9 +725,11 @@ nav a.on::before { color: var(--accent); }
             <select data-bind="display.theme" id="displayThemeSel">
               <option value="default" data-i18n="s.display.theme.default">Default</option>
               <option value="nothing" data-i18n="s.display.theme.nothing">Nothing OS (Dot-Matrix)</option>
+              <option value="nothing-light" data-i18n="s.display.theme.nothingLight">Nothing OS Light</option>
               <option value="cyberpunk" data-i18n="s.display.theme.cyberpunk">Cyberpunk (Neon HUD)</option>
               <option value="macglass" data-i18n="s.display.theme.macglass">MacBook Glass (Liquid)</option>
               <option value="industrial" data-i18n="s.display.theme.industrial">Industrial (Hardware)</option>
+              <option value="retro" data-i18n="s.display.theme.retro">Retro CRT Terminal</option>
               <option value="amoled" data-i18n="s.display.theme.amoled">AMOLED black</option>
               <option value="midnight" data-i18n="s.display.theme.midnight">Midnight blue</option>
               <option value="warm" data-i18n="s.display.theme.warm">Warm</option>
@@ -3250,9 +3254,11 @@ function renderThemeGallery() {
   const list = [
     { id: 'default', name: 'Default', sub: 'Aurora living glass', bars: ['#2dd4bf', '#6366f1'] },
     { id: 'nothing', name: 'Nothing OS', sub: 'Dot-matrix OLED · Red', bars: ['#ffffff', '#d71921'] },
+    { id: 'nothing-light', name: 'Nothing Light', sub: 'Matte paper · Dot-matrix', bars: ['#121212', '#d71921'] },
     { id: 'cyberpunk', name: 'Cyberpunk', sub: 'Night City Neon HUD', bars: ['#00f0ff', '#ff2a6d'] },
     { id: 'macglass', name: 'MacBook Glass', sub: 'macOS Liquid Vibrancy', bars: ['rgba(255,255,255,.85)', '#38bdf8'] },
     { id: 'industrial', name: 'Industrial', sub: 'CNC Gunmetal · Orange', bars: ['#ff5a1f', '#9ca3af'] },
+    { id: 'retro', name: 'Retro CRT', sub: 'Phosphor green terminal', bars: ['#33ff66', '#16a34a'] },
     { id: 'amoled', name: 'AMOLED Black', sub: 'Pure OLED black', bars: ['#2dd4bf', '#475569'] },
     { id: 'midnight', name: 'Midnight', sub: 'Deep indigo glass', bars: ['#60a5fa', '#818cf8'] },
     { id: 'warm', name: 'Warm', sub: 'Espresso amber', bars: ['#f59e0b', '#fb923c'] },

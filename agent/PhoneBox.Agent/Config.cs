@@ -163,7 +163,7 @@ public sealed class DisplayConfig
     public string Language { get; set; } = "auto";
     /// <summary>The codes the panel and the settings page are translated into (i18n.js). Casing matters for pt-BR:
     /// it is a distinct entry from pt, not a variant of it, so it must survive a save in this exact form.</summary>
-    internal static readonly string[] Languages = ["auto", "en", "tr", "de", "fr", "es", "it", "pt", "pt-BR", "nl", "pl", "ru", "el", "vi", "zh"];
+    internal static readonly string[] Languages = ["auto", "en", "id", "tr", "de", "fr", "es", "it", "pt", "pt-BR", "nl", "pl", "ru", "el", "vi", "zh"];
     public bool ShowSeconds { get; set; } = true;
     /// <summary>false ("14:05", default), true ("2:05 PM") or "auto" (follow the phone).</summary>
     [JsonConverter(typeof(Hour12JsonConverter))]
@@ -178,10 +178,10 @@ public sealed class DisplayConfig
     public bool VolumeKeys { get; set; } = true;
     /// <summary>landscape, portrait or auto (follow the phone). In portrait the widgets are arranged automatically.</summary>
     public string Orientation { get; set; } = "landscape";
-    /// <summary>default, nothing, cyberpunk, macglass, industrial, amoled, midnight, warm or graphite.</summary>
+    /// <summary>default, nothing, nothing-light, cyberpunk, macglass, industrial, retro, amoled, midnight, warm or graphite.</summary>
     public string Theme { get; set; } = "default";
     /// <summary>Visual themes recognized by the panel and desktop studio.</summary>
-    internal static readonly string[] Themes = ["default", "nothing", "cyberpunk", "macglass", "industrial", "amoled", "midnight", "warm", "graphite"];
+    internal static readonly string[] Themes = ["default", "nothing", "nothing-light", "cyberpunk", "macglass", "industrial", "retro", "amoled", "midnight", "warm", "graphite"];
     /// <summary>Accent colour (background glow, page dots), e.g. "#2dd4bf".</summary>
     public string Accent { get; set; } = "#2dd4bf";
     /// <summary>Tint the background with the album art's colour while music plays.</summary>
